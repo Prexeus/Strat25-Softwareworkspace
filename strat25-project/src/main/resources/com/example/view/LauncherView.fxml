@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.example.controller.LauncherController"
+      alignment="CENTER" spacing="14" prefWidth="520" prefHeight="300">
+    <padding><Insets topRightBottomLeft="20"/></padding>
+
+    <children>
+        <Label text="Start Game" style="-fx-font-size:18; -fx-font-weight:bold;"/>
+
+        <!-- Neue Spielstand-Erstellung -->
+        <HBox spacing="8" alignment="CENTER">
+            <children>
+                <TextField fx:id="saveNameField" promptText="Enter new save name…" prefWidth="260"/>
+                <Button fx:id="newBtn" text="New Game"/>
+            </children>
+        </HBox>
+
+        <!-- Vorhandene Saves -->
+        <HBox spacing="8" alignment="CENTER">
+            <children>
+                <ComboBox fx:id="savesBox" promptText="Select existing save" prefWidth="260"/>
+                <Button fx:id="refreshSavesBtn" text="↻"/>
+                <Button fx:id="loadBtn" text="Load Game"/>
+            </children>
+        </HBox>
+
+        <!-- Backups zu gewähltem Save -->
+        <HBox spacing="8" alignment="CENTER">
+            <children>
+                <ComboBox fx:id="backupsBox" promptText="Select backup of selected save" prefWidth="260"/>
+                <Button fx:id="refreshBackupsBtn" text="↻"/>
+                <Button fx:id="loadBackupBtn" text="Load Backup"/>
+            </children>
+        </HBox>
+    </children>
+</VBox>

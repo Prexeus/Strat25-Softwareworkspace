@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run JavaFX via Maven",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "com.example.Starter",
+      "preLaunchTask": "Maven: javafx:run"
+    }
+  ]
+}
