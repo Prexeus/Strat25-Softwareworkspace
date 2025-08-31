@@ -5,6 +5,7 @@ import com.example.model.GameTime;
 import javafx.application.Platform;
 
 import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -16,8 +17,6 @@ import java.util.function.Supplier;
  *  - Advances a Game's GameTime in "game seconds" (scaled by gameSpeed).
  *  - Schedules periodic events relative to *game time* (not wall clock).
  *  - Supports start / pause / resume / stop / close.
- *  - Prevents overlapping executions per event.
- *  - Uses a worker pool so event jobs (e.g., I/O) never block the 1s timer.
  *
  * Persistence:
  *  - This class is NOT serialized.
@@ -25,20 +24,19 @@ import java.util.function.Supplier;
  *  - On load, recreate GameClock, re-register events, and start/resume.
  *
  * Threading:
- *  - A single ScheduledExecutorService ticks every real second.
- *  - A small fixed worker pool runs event jobs (prevents timer blockage).
- *  - For JavaFX UI updates, use GameClock.fx(() -> {* update UI *}).
+ *  - A ScheduledExecutorService ticks every real second.
+ *  - Each tick is posted to the provided logic Executor (single writer).
+ *  - Events are executed on the logic thread as well (no overlap).
+ *  - For JavaFX UI updates, use GameClock.fx(() -> {*update UI*}).
  */
 public class GameClock implements AutoCloseable {
 
     private final Supplier<Game> gameSupplier;
+    private final Executor logic; // single-threaded, provided by GameRuntimeService
 
     // 1-second real-time ticker
     private final ScheduledExecutorService scheduler =
             Executors.newSingleThreadScheduledExecutor(daemon("game-time-scheduler"));
-
-    // Worker pool for event jobs
-    private final ExecutorService workers;
 
     // State flags
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -46,26 +44,13 @@ public class GameClock implements AutoCloseable {
 
     private ScheduledFuture<?> tickHandle;
 
-    // Playtime-based events
-    private final Map<String, GameTimedEvent> events = new ConcurrentHashMap<>();
+    // Playtime-based events (managed on logic thread)
+    private final Map<String, GameTimedEvent> events = new HashMap<>();
 
-    /** Creates a GameClock with 2 worker threads (good default). */
-    public GameClock(Supplier<Game> gameSupplier) {
-        this(gameSupplier, 2);
-    }
-
-    /**
-     * @param gameSupplier   supplies the current Game (may return null if no game loaded)
-     * @param workerThreads  number of worker threads for event jobs (>=1 recommended).
-     *                       If <= 0, a DirectExecutor is used (jobs run on scheduler thread).
-     */
-    public GameClock(Supplier<Game> gameSupplier, int workerThreads) {
+    /** Creates a GameClock that posts ticks & events onto the given logic executor. */
+    public GameClock(Supplier<Game> gameSupplier, Executor logic) {
         this.gameSupplier = gameSupplier;
-        if (workerThreads <= 0) {
-            this.workers = new DirectExecutor();
-        } else {
-            this.workers = Executors.newFixedThreadPool(workerThreads, daemon("game-time-worker"));
-        }
+        this.logic = logic;
     }
 
     /** Starts time advancing and event checks. Idempotent. */
@@ -76,19 +61,8 @@ public class GameClock implements AutoCloseable {
 
         tickHandle = scheduler.scheduleAtFixedRate(() -> {
             if (!running.get() || paused.get()) return;
-
-            Game g = gameSupplier.get();
-            if (g == null) return;
-            GameTime gt = g.getGameTime();
-            if (gt == null) return;
-
-            // 1) advance active playtime by gameSpeed (scaledSeconds += gameSpeed)
-            double next = gt.getScaledSeconds() + gt.getGameSpeed();
-            gt.setScaledSeconds(next);
-
-            // 2) check due events against whole game-seconds
-            long now = (long) Math.floor(next); // floor avoids early firing
-            tickEvents(now);
+            // Post the whole tick to the logic thread (single writer)
+            logic.execute(this::tickOnceOnLogic);
         }, 1, 1, TimeUnit.SECONDS);
     }
 
@@ -116,7 +90,37 @@ public class GameClock implements AutoCloseable {
     public void close() {
         stop();
         scheduler.shutdownNow();
-        workers.shutdownNow();
+    }
+
+    // ---------- Tick (runs on logic thread) ----------------------------------
+
+    private void tickOnceOnLogic() {
+        Game g = gameSupplier.get();
+        if (g == null) return;
+        GameTime gt = g.getGameTime();
+        if (gt == null) return;
+
+        // 1) advance active playtime by gameSpeed (scaledSeconds += gameSpeed)
+        double next = gt.getScaledSeconds() + gt.getGameSpeed();
+        gt.setScaledSeconds(next);
+
+        // 2) check due events against whole game-seconds
+        long now = (long) Math.floor(next); // floor avoids early firing
+
+        // iterate over a copy to avoid CME if someone unregisters concurrently on logic
+        for (GameTimedEvent ev : events.values().toArray(new GameTimedEvent[0])) {
+            if (now >= ev.nextDueSeconds) {
+                try {
+                    ev.job.run(); // runs on logic thread (serial)
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                } finally {
+                    long nextDue = now + ev.periodSeconds;
+                    if (nextDue <= now) nextDue = now + 1; // safety net
+                    ev.nextDueSeconds = nextDue;
+                }
+            }
+        }
     }
 
     // ---------- Queries & Convenience (proxy to GameTime) ---------------------
@@ -148,6 +152,7 @@ public class GameClock implements AutoCloseable {
         if (speed <= 0) throw new IllegalArgumentException("Speed must be > 0");
         Game g = gameSupplier.get();
         if (g != null && g.getGameTime() != null) {
+            // This may be called from UI thread; write is simple and visible on next logic tick.
             g.getGameTime().setGameSpeed(speed);
         }
     }
@@ -191,38 +196,14 @@ public class GameClock implements AutoCloseable {
         events.put(name, new GameTimedEvent(name, job, periodSeconds, initialDelaySeconds, startNow));
     }
 
-    /** Removes a registered event by name. */
-    public void unregister(String name) { events.remove(name); }
+    /** Removes a registered event by name. Call on the logic thread for safety. */
+    public synchronized void unregister(String name) { events.remove(name); }
 
     /** Removes all registered events. */
-    public void clearEvents() { events.clear(); }
+    public synchronized void clearEvents() { events.clear(); }
 
     /** Utility for JavaFX: safely run on FX Application Thread. */
     public static Runnable fx(Runnable uiWork) { return () -> Platform.runLater(uiWork); }
-
-    // ---------- internals -----------------------------------------------------
-
-    private void tickEvents(long nowSeconds) {
-        for (GameTimedEvent ev : events.values()) {
-            if (nowSeconds >= ev.nextDueSeconds) {
-                // Prevent overlap (skip if previous execution still running)
-                if (!ev.runningJob.compareAndSet(false, true)) continue;
-
-                workers.execute(() -> {
-                    try {
-                        ev.job.run();
-                    } catch (Throwable t) {
-                        t.printStackTrace();
-                    } finally {
-                        long next = nowSeconds + ev.periodSeconds;
-                        if (next <= nowSeconds) next = nowSeconds + 1; // safety net
-                        ev.nextDueSeconds = next;
-                        ev.runningJob.set(false);
-                    }
-                });
-            }
-        }
-    }
 
     private static ThreadFactory daemon(String name) {
         return r -> {
@@ -235,11 +216,10 @@ public class GameClock implements AutoCloseable {
     /** Container for a playtime-based periodic event. */
     private static final class GameTimedEvent {
         final String name;
-        final Runnable job;
+        final Runnable job;          // executed on logic thread
         final long periodSeconds;
         final long initialDelaySeconds;
         volatile long nextDueSeconds; // next due time in whole *game seconds*
-        final AtomicBoolean runningJob = new AtomicBoolean(false);
 
         GameTimedEvent(String name, Runnable job, long periodSeconds,
                        long initialDelaySeconds, long startNowSeconds) {
@@ -249,24 +229,5 @@ public class GameClock implements AutoCloseable {
             this.initialDelaySeconds = initialDelaySeconds;
             this.nextDueSeconds = startNowSeconds + initialDelaySeconds;
         }
-    }
-
-    /** Direct executor fallback (avoid for I/O heavy jobs). */
-    private static final class DirectExecutor implements ExecutorService {
-        private volatile boolean shutdown;
-
-        @Override public void execute(Runnable command) { command.run(); }
-        @Override public void shutdown() { shutdown = true; }
-        @Override public java.util.List<Runnable> shutdownNow() { shutdown = true; return java.util.Collections.emptyList(); }
-        @Override public boolean isShutdown() { return shutdown; }
-        @Override public boolean isTerminated() { return shutdown; }
-        @Override public boolean awaitTermination(long timeout, TimeUnit unit) { return true; }
-        @Override public <T> Future<T> submit(Callable<T> task) { return CompletableFuture.supplyAsync(() -> { try { return task.call(); } catch (Exception e) { throw new CompletionException(e); } }); }
-        @Override public <T> Future<T> submit(Runnable task, T result) { task.run(); return CompletableFuture.completedFuture(result); }
-        @Override public Future<?> submit(Runnable task) { task.run(); return CompletableFuture.completedFuture(null); }
-        @Override public <T> java.util.List<Future<T>> invokeAll(java.util.Collection<? extends Callable<T>> tasks) { throw new UnsupportedOperationException(); }
-        @Override public <T> java.util.List<Future<T>> invokeAll(java.util.Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) { throw new UnsupportedOperationException(); }
-        @Override public <T> T invokeAny(java.util.Collection<? extends Callable<T>> tasks) { throw new UnsupportedOperationException(); }
-        @Override public <T> T invokeAny(java.util.Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) { throw new UnsupportedOperationException(); }
     }
 }

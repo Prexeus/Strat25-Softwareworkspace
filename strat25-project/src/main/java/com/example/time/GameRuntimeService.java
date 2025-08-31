@@ -1,13 +1,16 @@
 package com.example.time;
+
 import com.example.model.Game;
 import com.example.service.GameService;
 
+import java.util.concurrent.*;
 import java.util.function.Supplier;
 
 /**
  * GameRuntimeService
  * ------------------
  * Orchestrates time-driven gameplay for the active session.
+ * Uses a single-threaded Logic Executor as the only writer to game state.
  *
  * Responsibilities:
  *  - Owns a GameClock and registers playtime-based events (autosave, prestige, ...).
@@ -15,12 +18,27 @@ import java.util.function.Supplier;
  *  - Reads & writes time/speed via the Game's persisted GameTime.
  *
  * Usage:
- *  - Construct with a GameService (must expose getGame())
- *  - Call start() when entering in-game, pause()/resume() from UI, stop()/close() when leaving/exit.
+ *  - Construct with a GameService (must expose getGame()).
+ *  - Call start() when entering in-game; pause()/resume() from UI; stop()/close() on leave/exit.
  */
 public class GameRuntimeService implements AutoCloseable {
 
     private final GameService gameService;
+
+    /** The ONLY thread that mutates game state. */
+    private final ExecutorService logic = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "game-logic");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /** Optional separate pool for heavy I/O tasks if ever needed. */
+    private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "game-io");
+        t.setDaemon(true);
+        return t;
+    });
+
     private final GameClock clock;
 
     /**
@@ -28,24 +46,24 @@ public class GameRuntimeService implements AutoCloseable {
      * from the GameService (even if you load/switch saves later).
      */
     public GameRuntimeService(GameService gameService) {
-        this(gameService, 2);
+        this(gameService, /*unused legacy param*/ 0);
     }
 
-    public GameRuntimeService(GameService gameService, int clockWorkerThreads) {
+    public GameRuntimeService(GameService gameService, int ignored) {
         this.gameService = gameService;
 
         // Supplier that always returns the current Game from the session
-        Supplier<Game> gameSupplier = () -> getGame();
+        Supplier<Game> gameSupplier = this::getGame;
 
-        // Clock pulls & updates Game.gameTime on each real-second tick
-        this.clock = new GameClock(gameSupplier, clockWorkerThreads);
+        // Clock posts all ticks & events onto the logic executor
+        this.clock = new GameClock(gameSupplier, logic);
 
         registerTimedEvents();
     }
 
     /**
      * Central place to declare recurring mechanics.
-     * Adjust or extend as your game grows.
+     * All jobs run on the logic thread (serial, thread-safe).
      */
     private void registerTimedEvents() {
         // AUTOSAVE: every 10 minutes of active playtime
@@ -53,21 +71,22 @@ public class GameRuntimeService implements AutoCloseable {
                 "autosave",
                 () -> {
                     try {
-                        gameService.saveGame();
+                        // Pause time & events while saving to keep a clean snapshot.
+                        pause();
+                        gameService.saveGame(); // runs on logic thread; blocks logic briefly
                     } catch (Exception e) {
                         e.printStackTrace();
+                    } finally {
+                        resume();
                     }
                 },
                 10 * 60
         );
 
         // PRESTIGE: every 10 seconds of active playtime
-        // Delegates to the domain (Game) method you prepared.
         clock.registerPeriodicByGameTime(
                 "prestigeDistribution",
-                () -> {
-                    getGame().addTimedPrestige();
-                },
+                () -> getGame().addTimedPrestige(),
                 10
         );
 
@@ -75,14 +94,11 @@ public class GameRuntimeService implements AutoCloseable {
         clock.registerPeriodicByGameTime(
                 "prestigeMultiplier",
                 () -> {
-                    getGame().setPrestigeMultiplier(getGame().getPrestigeMultiplier() * 1.05);
+                    Game g = getGame();
+                    g.setPrestigeMultiplier(g.getPrestigeMultiplier() * 1.05);
                 },
                 10 * 60
         );
-
-        // EXAMPLES for more mechanics:
-        // clock.registerPeriodicByGameTime("bonus", () -> bonuses.applyTo(gameService.getGame()), 30);
-        // clock.registerPeriodicByGameTime("spawn", () -> spawner.spawnWave(gameService.getGame()), 90);
     }
 
     // ----------------- Lifecycle -----------------
@@ -104,13 +120,18 @@ public class GameRuntimeService implements AutoCloseable {
 
     /** For app shutdown / permanent dispose. */
     @Override
-    public void close()  { clock.close(); }
+    public void close()  {
+        stop();
+        clock.close();
+        logic.shutdownNow();
+        io.shutdownNow();
+    }
 
     // -------------- Queries / Controls ----------
 
-    public long   getElapsedSeconds()   { return clock.getElapsedSeconds(); }
+    public long   getElapsedSeconds()      { return clock.getElapsedSeconds(); }
     public double getElapsedSecondsExact() { return clock.getElapsedSecondsExact(); }
-    public String getElapsedFormatted() { return clock.getElapsedFormatted(); }
+    public String getElapsedFormatted()    { return clock.getElapsedFormatted(); }
 
     public void   setGameSpeed(double speed) { clock.setGameSpeed(speed); }
     public double getGameSpeed()             { return clock.getGameSpeed(); }
@@ -118,7 +139,16 @@ public class GameRuntimeService implements AutoCloseable {
     /** Expose the clock if you want to register/remove events dynamically (optional). */
     public GameClock getClock() { return clock; }
 
-    public Game getGame(){
-        return gameService.getGame();
+    public Game getGame() { return gameService.getGame(); }
+
+    // -------------- Logic API for controllers/services --------
+
+    /** Post a mutation to the single logic thread (fire-and-forget). */
+    public void runOnLogic(Runnable r) { logic.execute(r); }
+
+    /** Compute a value on the logic thread (blocking). Use sparingly in UI. */
+    public <T> T callOnLogic(Callable<T> c) {
+        try { return logic.submit(c).get(); }
+        catch (Exception e) { throw new RuntimeException(e); }
     }
 }

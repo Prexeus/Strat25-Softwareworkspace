@@ -1,17 +1,18 @@
 package com.example.service;
 
-import java.util.List;
-
 import com.example.model.Game;
 import com.example.repository.RepositoryService;
 import com.example.time.GameRuntimeService;
+
+import java.util.List;
+import java.util.concurrent.Callable;
 
 public class GameService {
 
     private Game game;
 
-    private RepositoryService<Game> gameRepository;
-    private GameRuntimeService gameRuntimeService;
+    private final RepositoryService<Game> gameRepository;
+    private final GameRuntimeService gameRuntimeService;
 
     public GameService() {
         this.gameRepository = new RepositoryService<>();
@@ -62,6 +63,20 @@ public class GameService {
         gameRuntimeService.stop();
     }
 
+    // -------------- Logic thread helpers (für Controller & andere Services) --
+
+    /** Post a mutation to the single logic thread (fire-and-forget). */
+    public void runOnLogic(Runnable r) {
+        gameRuntimeService.runOnLogic(r);
+    }
+
+    /** Compute a value on the logic thread (blocking). Use sparingly in UI. */
+    public <T> T callOnLogic(Callable<T> c) {
+        return gameRuntimeService.callOnLogic(c);
+    }
+
+    // ----------------- Accessors -----------------
+
     public Game getGame() {
         return game;
     }
@@ -75,5 +90,4 @@ public class GameService {
                 + getGame().getCategories().get(1).getName() + ", "
                 + getGame().getCategories().get(2).getName());
     }
-
 }

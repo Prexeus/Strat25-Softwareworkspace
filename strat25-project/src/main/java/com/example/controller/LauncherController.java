@@ -55,7 +55,6 @@ public class LauncherController {
         if (name.isEmpty()) { warn("Please enter a name for the new game."); return; }
         try {
             gameService.buildNewGame(name);
-            gameService.startGame();
             sceneManager.showGame();
         } catch (Exception ex) {
             error("Failed to create new game:\n" + ex.getMessage());

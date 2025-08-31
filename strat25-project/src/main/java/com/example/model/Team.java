@@ -13,7 +13,7 @@ public class Team implements Serializable {
 
     private Family family;
 
-    private double prestige;
+    private volatile double prestige;
 
     public Team(String name, int id, SerializableColor color, Family family) {
         this.name = name;

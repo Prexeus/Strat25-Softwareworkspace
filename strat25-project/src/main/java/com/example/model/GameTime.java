@@ -6,8 +6,8 @@ public class GameTime implements Serializable{
 
     private static final long serialVersionUID = 1L;
 
-    private double scaledSeconds = 0.0;
-    private double gameSpeed = 1.0;
+    private volatile double scaledSeconds = 0.0;
+    private volatile double gameSpeed = 1.0;
 
     public double getScaledSeconds() {
         return scaledSeconds;

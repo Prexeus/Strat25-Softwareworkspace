@@ -5,6 +5,7 @@ import com.example.service.GameService;
 import com.example.view.SceneManager;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.application.Platform;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.fxml.FXML;
@@ -92,17 +93,20 @@ public class GameController {
             if (uiTicker != null) uiTicker.stop();
         });
 
-        // save
-        saveBtn.setOnAction(e -> {
+        // save (läuft auf Logic-Thread; UI via Platform.runLater)
+        saveBtn.setOnAction(e -> gameService.runOnLogic(() -> {
             try {
+                gameService.pauseGame();
                 gameService.saveGame();
-                info("Game saved.");
+                Platform.runLater(() -> info("Game saved."));
             } catch (Exception ex) {
-                error("Saving failed:\n" + ex.getMessage());
+                Platform.runLater(() -> error("Saving failed:\n" + ex.getMessage()));
+            } finally {
+                gameService.resumeGame();
             }
-        });
+        }));
 
-        // speed / multiplier
+        // speed / multiplier (Mutationen auf Logic-Thread)
         applySpeedBtn.setOnAction(e -> applySpeedFromField());
         speedField.setOnAction(e -> applySpeedFromField());
         applyMultiplierBtn.setOnAction(e -> applyMultiplierFromField());
@@ -134,9 +138,13 @@ public class GameController {
                 warn("Bitte zuerst ein Bauspiel rechts auswählen.");
                 return;
             }
-            bc.nextConstructionPhase();
-            info("Nächste Bauetappe gestartet: " + bc.getName());
-            refreshBuildSelectionInTabs();
+            gameService.runOnLogic(() -> {
+                bc.nextConstructionPhase();
+                Platform.runLater(() -> {
+                    info("Nächste Bauetappe gestartet: " + bc.getName());
+                    refreshBuildSelectionInTabs();
+                });
+            });
         });
 
         // build tabs + first fill
@@ -207,8 +215,8 @@ public class GameController {
                 prestigeDeltaField.setPrefWidth(100);
                 Button prestigeAddBtn = new Button("Add");
                 prestigeRow.getChildren().addAll(prestigeLabel, prestigeValue, prestigeDeltaField, prestigeAddBtn);
-                prestigeAddBtn.setOnAction(e -> applyTeamPrestigeDelta(t, prestigeDeltaField, prestigeValue));
-                prestigeDeltaField.setOnAction(e -> applyTeamPrestigeDelta(t, prestigeDeltaField, prestigeValue));
+                prestigeAddBtn.setOnAction(e -> applyTeamPrestigeDelta(t, prestigeDeltaField));
+                prestigeDeltaField.setOnAction(e -> applyTeamPrestigeDelta(t, prestigeDeltaField));
                 root.getChildren().add(prestigeRow);
 
                 // Section header: Einfluss
@@ -313,15 +321,14 @@ public class GameController {
         }
     }
 
-    // -------- Actions --------
+    // -------- Actions (alle Mutationen via Logic-Thread) --------
 
-    private void applyTeamPrestigeDelta(Team team, TextField deltaField, Label prestigeValue) {
+    private void applyTeamPrestigeDelta(Team team, TextField deltaField) {
         String txt = deltaField.getText();
         if (txt == null || txt.isBlank()) { warn("Enter a number like 12 or -30."); return; }
         try {
             double v = Double.parseDouble(txt.replace(',', '.'));
-            team.addPrestige(v);
-            prestigeValue.setText(String.format("%.2f", team.getPrestige()));
+            gameService.runOnLogic(() -> team.addPrestige(v));
             deltaField.clear();
         } catch (NumberFormatException nfe) {
             warn("Invalid number. Examples: 12, -30, 3.5");
@@ -333,9 +340,11 @@ public class GameController {
         if (txt == null || txt.isBlank()) { warn("Enter a number like 5 or -2."); return; }
         try {
             double v = Double.parseDouble(txt.replace(',', '.'));
-            ensureTeamKey(row.category.getInfluenceMap(), team.getId());
-            row.category.addInfluence(team, v);
-            updateInfluenceRow(row, team, gameService.getGame());
+            gameService.runOnLogic(() -> {
+                Map<Integer, Double> map = row.category.getInfluenceMap();
+                if (!map.containsKey(team.getId())) map.put(team.getId(), 0.0);
+                row.category.addInfluence(team, v);
+            });
             row.deltaField.clear();
         } catch (NumberFormatException nfe) {
             warn("Invalid number. Examples: 5, -2, 1.25");
@@ -353,25 +362,30 @@ public class GameController {
             warn("Bitte eine Menge eingeben (z. B. 2).");
             return;
         }
-        int free = calcFree(bc, row.material);
-        if (free <= 0) {
-            warn("Für " + row.material.name() + " wird aktuell nichts mehr benötigt.");
-            row.amountField.clear();
-            return;
-        }
+        int v;
         try {
-            int v = Integer.parseInt(txt.trim());
+            v = Integer.parseInt(txt.trim());
             if (v <= 0) { warn("Nur positive Mengen einzahlen."); return; }
-            if (v > free) {
-                warn("Maximal " + free + " einzahlbar (noch frei).");
-                return; // NICHT absenden
-            }
-            bc.addMaterial(team, row.material, v);
-            row.amountField.clear();
-            updateSingleMaterialRow(row, bc);
         } catch (NumberFormatException nfe) {
             warn("Ungültige Zahl. Beispiel: 2");
+            return;
         }
+
+        // Prüfung + Einzahlung AUF dem Logic-Thread (finale Autorität)
+        gameService.runOnLogic(() -> {
+            int free = calcFree(bc, row.material);
+            if (free <= 0) {
+                Platform.runLater(() -> warn("Für " + row.material.name() + " wird aktuell nichts mehr benötigt."));
+                return;
+            }
+            if (v > free) {
+                int max = free;
+                Platform.runLater(() -> warn("Maximal " + max + " einzahlbar (noch frei)."));
+                return;
+            }
+            bc.addMaterial(team, row.material, v);
+            Platform.runLater(row.amountField::clear);
+        });
     }
 
     private int calcFree(BuildCategory bc, Material material) {
@@ -390,8 +404,7 @@ public class GameController {
         try {
             double v = Double.parseDouble(txt.replace(',', '.'));
             if (v <= 0) throw new IllegalArgumentException("Speed must be > 0");
-            g.getGameTime().setGameSpeed(v);
-            speedLabel.setText(speedText(v));
+            gameService.runOnLogic(() -> g.getGameTime().setGameSpeed(v));
             speedField.clear();
         } catch (Exception ex) {
             warn("Invalid speed. Use a positive number (e.g., 1.0, 2.0, 0.5).");
@@ -406,8 +419,7 @@ public class GameController {
         try {
             double v = Double.parseDouble(txt.replace(',', '.'));
             if (v <= 0) throw new IllegalArgumentException("Multiplier must be > 0");
-            g.setPrestigeMultiplier(v);
-            multiplierLabel.setText(multiplierText(v));
+            gameService.runOnLogic(() -> g.setPrestigeMultiplier(v));
             multiplierField.clear();
         } catch (Exception ex) {
             warn("Invalid multiplier. Use a positive number (e.g., 1.0, 2.0, 0.5).");
@@ -418,8 +430,8 @@ public class GameController {
 
     private void updateInfluenceRow(InfluenceRow row, Team team, Game game) {
         if (row == null || team == null || game == null) return;
-        HashMap<Integer, Double> map = row.category.getInfluenceMap();
-        ensureTeamKey(map, team.getId());
+        Map<Integer, Double> map = row.category.getInfluenceMap();
+        if (!map.containsKey(team.getId())) map.put(team.getId(), 0.0);
         double own = map.getOrDefault(team.getId(), 0.0);
         double total = 0.0;
         for (double v : map.values()) total += v;
@@ -494,8 +506,7 @@ public class GameController {
         try {
             double v = Double.parseDouble(txt.replace(',', '.'));
             if (v <= 0) throw new IllegalArgumentException("Multiplier must be > 0");
-            cmr.category.setPrestigeMultiplier(v);
-            cmr.currentLabel.setText(multiplierText(v));
+            gameService.runOnLogic(() -> cmr.category.setPrestigeMultiplier(v));
             cmr.input.clear();
         } catch (Exception ex) {
             warn("Ungültiger Multiplikator. Beispiele: 1.0, 2.0, 0.5");
@@ -523,10 +534,6 @@ public class GameController {
         return null;
     }
 
-    private static void ensureTeamKey(HashMap<Integer, Double> map, Integer teamId) {
-        if (!map.containsKey(teamId)) map.put(teamId, 0.0);
-    }
-
     private void refreshPrestigeTable() {
         Game g = gameService.getGame();
         if (g == null) return;
@@ -548,7 +555,6 @@ public class GameController {
         }
     }
 
-    // Kleine Label-Hilfe für Tabellen-Header
     private static Label styledSmall(String text, boolean bold) {
         Label l = new Label(text);
         StringBuilder sb = new StringBuilder("-fx-font-size: 11;");

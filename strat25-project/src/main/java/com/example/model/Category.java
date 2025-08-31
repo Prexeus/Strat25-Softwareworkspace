@@ -3,6 +3,8 @@ package com.example.model;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 
@@ -12,9 +14,9 @@ public class Category implements Serializable, CategoryInterface {
 
     private String name;
     
-    private HashMap<Integer, Double> influenceMap = new HashMap<>();
+    private Map<Integer, Double> influenceMap = new ConcurrentHashMap<>();
 
-    private double prestigeMultiplier = 1.0;
+    private volatile double prestigeMultiplier = 1.0;
 
     public Category(String name, Collection<Team> teams) {
         this.name = name;
@@ -34,7 +36,7 @@ public class Category implements Serializable, CategoryInterface {
     }
 
     @Override
-    public HashMap<Integer, Double> getInfluenceMap() {
+    public Map<Integer, Double> getInfluenceMap() {
         return influenceMap;
     }
 

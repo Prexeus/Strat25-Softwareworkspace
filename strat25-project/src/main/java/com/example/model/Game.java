@@ -16,7 +16,7 @@ public class Game implements RepositoryItem, Serializable {
 
     private GameTime gameTime = new GameTime();
 
-    private double prestigeMultiplier = 1.0;
+    private volatile double prestigeMultiplier = 1.0;
 
     public Game(String name, List<Family> families, List<CategoryInterface> categories) {
         this.name = name;
