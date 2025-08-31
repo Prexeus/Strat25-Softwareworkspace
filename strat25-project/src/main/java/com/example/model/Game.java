@@ -7,6 +7,8 @@ import com.example.repository.RepositoryItem;
 
 public class Game implements RepositoryItem, Serializable {
 
+    private static final long serialVersionUID = 1L;
+
     private String name;
 
     private List<Family> families;

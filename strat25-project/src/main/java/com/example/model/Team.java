@@ -4,12 +4,16 @@ import java.io.Serializable;
 
 public class Team implements Serializable {
 
+    private static final long serialVersionUID = 1L;
+
     private String name;
 
     private SerializableColor color;
     private Integer id;
 
     private Family family;
+
+    private double prestige;
 
     public Team(String name, int id, SerializableColor color, Family family) {
         this.name = name;
@@ -33,5 +37,17 @@ public class Team implements Serializable {
 
     public Integer getId() {
         return id;
+    }
+
+    public double getPrestige() {
+        return prestige;
+    }
+
+    public void setPrestige(double prestige) {
+        this.prestige = prestige;
+    }
+
+    public void addPrestige(double prestige) {
+        this.prestige += prestige;
     }
 }

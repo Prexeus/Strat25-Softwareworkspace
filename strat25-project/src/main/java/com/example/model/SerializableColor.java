@@ -14,6 +14,7 @@ import java.util.Objects;
  * Note: The JavaFX Color itself is NOT serialized; it's cached transiently.
  */
 public final class SerializableColor implements Serializable {
+    
     private static final long serialVersionUID = 1L;
 
     private final double r; // 0..1

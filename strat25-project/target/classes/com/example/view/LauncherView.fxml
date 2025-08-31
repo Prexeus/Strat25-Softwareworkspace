@@ -21,4 +21,20 @@
 
         <!-- Vorhandene Saves -->
         <HBox spacing="8" alignment="CENTER">
-            
+            <children>
+                <ComboBox fx:id="savesBox" promptText="Select existing save" prefWidth="260"/>
+                <Button fx:id="refreshSavesBtn" text="↻"/>
+                <Button fx:id="loadBtn" text="Load Game"/>
+            </children>
+        </HBox>
+
+        <!-- Backups zu gewähltem Save -->
+        <HBox spacing="8" alignment="CENTER">
+            <children>
+                <ComboBox fx:id="backupsBox" promptText="Select backup of selected save" prefWidth="260"/>
+                <Button fx:id="refreshBackupsBtn" text="↻"/>
+                <Button fx:id="loadBackupBtn" text="Load Backup"/>
+            </children>
+        </HBox>
+    </children>
+</VBox>

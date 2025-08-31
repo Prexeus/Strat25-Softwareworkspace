@@ -4,6 +4,8 @@ import java.io.Serializable;
 
 public class GameTime implements Serializable{
 
+    private static final long serialVersionUID = 1L;
+
     private double scaledSeconds = 0.0;
     private double gameSpeed = 1.0;
 

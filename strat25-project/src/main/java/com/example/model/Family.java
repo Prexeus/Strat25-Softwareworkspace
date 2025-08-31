@@ -7,6 +7,8 @@ import java.util.List;
 
 public class Family implements Serializable {
 
+    private static final long serialVersionUID = 1L;
+
     private String name;
     private SerializableColor color;
 
