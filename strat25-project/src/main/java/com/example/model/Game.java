@@ -12,13 +12,13 @@ public class Game implements RepositoryItem, Serializable {
     private String name;
 
     private List<Family> families;
-    private List<Category> categories;
+    private List<CategoryInterface> categories;
 
     private GameTime gameTime = new GameTime();
 
     private double prestigeMultiplier = 1.0;
 
-    public Game(String name, List<Family> families, List<Category> categories) {
+    public Game(String name, List<Family> families, List<CategoryInterface> categories) {
         this.name = name;
         this.families = families;
         this.categories = categories;
@@ -36,7 +36,7 @@ public class Game implements RepositoryItem, Serializable {
         return families;
     }
 
-    public List<Category> getCategories() {
+    public List<CategoryInterface> getCategories() {
         return categories;
     }
 

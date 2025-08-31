@@ -1,7 +1,11 @@
 package com.example.service;
 
+import java.io.InputStream;
+import java.nio.file.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.example.model.*;
 
@@ -40,19 +44,68 @@ public class GameFactoryService {
         teams.add(new Team("Team 9", 9, SerializableColor.of255(40, 120, 40), familyGreen)); 
 
 
-        List<Category> categorys = new ArrayList<>();
+        List<CategoryInterface> categorys = new ArrayList<>();
         categorys.add(new Category("Kategorie 1", teams));
         categorys.add(new Category("Kategorie 2", teams));
         categorys.add(new Category("Kategorie 3", teams));
-        categorys.add(new Category("Kategorie 4", teams));
-        categorys.add(new Category("Kategorie 5", teams));
-        categorys.add(new Category("Kategorie 6", teams));
-        categorys.add(new Category("Kategorie 7", teams));
+
+        Path revCsv = classpathCsvToTemp("/com/example/csv/revolution.csv");
+        Path verCsv = classpathCsvToTemp("/com/example/csv/versailles.csv");
+
+        Map<Material, Double> materialWorths = new HashMap<>();
+        materialWorths.put(Material.BAUMSTAEMME, 1.205);
+        materialWorths.put(Material.STEIN, 1.205);
+        materialWorths.put(Material.WEIZEN, 0.6025);
+        materialWorths.put(Material.ERZ, 0.6025);
+        materialWorths.put(Material.BRETTER, 0.3346);
+        materialWorths.put(Material.STEINZIEGEL, 0.1115);
+        materialWorths.put(Material.BROT, 0.7807);
+        materialWorths.put(Material.METALL, 1.1154);
+        materialWorths.put(Material.WAFFEN, 1.2269);
+        materialWorths.put(Material.MILITAERISCHE_STAERKE, 0.3346);
+        materialWorths.put(Material.HYMNEN, 0.0536);
+
+
+        CategoryInterface revolution = new BuildCategory("Revolution", teams, revCsv, materialWorths);
+        CategoryInterface versailles = new BuildCategory("Versailles", teams, verCsv, materialWorths);
+
+        categorys.add(revolution);
+        categorys.add(versailles);
 
         // Neues Game-Objekt erzeugen
         Game game = new Game(gameName, families, categorys);
 
         return game;
+    }
+
+
+
+    /**
+     * Lädt eine CSV vom Classpath und gibt einen Path zurück.
+     * - Wenn die Ressource als normale Datei vorliegt (Dev), wird direkt ein Path erzeugt.
+     * - Wenn sie im JAR liegt, wird sie in eine Temp-Datei kopiert und dieser Path zurückgegeben.
+     */
+    private static Path classpathCsvToTemp(String resourcePath) {
+        try {
+            var url = GameFactoryService.class.getResource(resourcePath);
+            if (url == null) {
+                throw new IllegalStateException("CSV resource not found: " + resourcePath);
+            }
+            if ("file".equalsIgnoreCase(url.getProtocol())) {
+                // Direkt als Path nutzbar (Dev/target/classes)
+                return Paths.get(url.toURI());
+            }
+            // z. B. "jar:" -> in Temp-Datei kopieren
+            try (InputStream in = GameFactoryService.class.getResourceAsStream(resourcePath)) {
+                if (in == null) throw new IllegalStateException("CSV resource stream is null: " + resourcePath);
+                Path tmp = Files.createTempFile("buildcat_", ".csv");
+                Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+                tmp.toFile().deleteOnExit();
+                return tmp;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to resolve CSV resource: " + resourcePath, e);
+        }
     }
 
 }

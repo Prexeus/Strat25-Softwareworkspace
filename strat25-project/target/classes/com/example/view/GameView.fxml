@@ -3,22 +3,19 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<BorderPane xmlns="http://javafx.com/javafx/21"
-    xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.controller.GameController" prefWidth="960" prefHeight="600">
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.example.controller.GameController"
+            prefWidth="1200" prefHeight="700">
 
-    <!-- Main content placeholder (left/center) -->
+    <!-- CENTER: nur die Team-Tabs -->
     <center>
-        <StackPane>
-            <Label text="Your main game area goes here"/>
-        </StackPane>
+        <TabPane fx:id="teamsTabs" tabClosingPolicy="UNAVAILABLE"/>
     </center>
 
-    <!-- Right info column -->
+    <!-- RIGHT: Info column -->
     <right>
-        <VBox spacing="10" prefWidth="320">
-            <padding>
-                <Insets topRightBottomLeft="16"/>
-            </padding>
+        <VBox spacing="10" prefWidth="460">
+            <padding><Insets topRightBottomLeft="16"/></padding>
             <children>
 
                 <Label text="Game Info" style="-fx-font-size:16; -fx-font-weight:bold;"/>
@@ -26,7 +23,7 @@
                 <GridPane hgap="8" vgap="6">
                     <columnConstraints>
                         <ColumnConstraints halignment="RIGHT" percentWidth="35"/>
-                        <ColumnConstraints halignment="LEFT" percentWidth="65"/>
+                        <ColumnConstraints halignment="LEFT"  percentWidth="65"/>
                     </columnConstraints>
 
                     <children>
@@ -39,30 +36,57 @@
                         <Label text="Speed:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
                         <HBox spacing="6" GridPane.rowIndex="2" GridPane.columnIndex="1">
                             <children>
-                                <Label fx:id="speedLabel" />
+                                <Label fx:id="speedLabel"/>
                                 <TextField fx:id="speedField" promptText="1.0" prefWidth="80"/>
                                 <Button fx:id="applySpeedBtn" text="Apply"/>
                             </children>
                         </HBox>
 
+                        <Label text="Prestige ×:" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                        <HBox spacing="6" GridPane.rowIndex="3" GridPane.columnIndex="1">
+                            <children>
+                                <Label fx:id="multiplierLabel"/>
+                                <TextField fx:id="multiplierField" promptText="1.0" prefWidth="80"/>
+                                <Button fx:id="applyMultiplierBtn" text="Apply"/>
+                            </children>
+                        </HBox>
                     </children>
                 </GridPane>
 
                 <HBox spacing="8">
-                    <Button fx:id="startBtn" text="Start"/>
-                    <Button fx:id="pauseBtn" text="Pause"/>
+                    <Button fx:id="startBtn"  text="Start"/>
+                    <Button fx:id="pauseBtn"  text="Pause"/>
                     <Button fx:id="resumeBtn" text="Resume"/>
-                    <Button fx:id="stopBtn" text="Stop"/>
+                    <Button fx:id="stopBtn"   text="Stop"/>
+                </HBox>
+
+                <!-- Save button (normal save) -->
+                <HBox spacing="8" alignment="CENTER_RIGHT">
+                    <Button fx:id="saveBtn" text="Save"/>
                 </HBox>
 
                 <Separator/>
 
-                <Label text="Family Prestige (sum)" style="-fx-font-weight:bold;"/>
+                <!-- Bau-Auswahl + nächste Etappe -->
+                <Label text="Bau-Auswahl" style="-fx-font-weight:bold;"/>
+                <ComboBox fx:id="buildSelect" promptText="Bauspiel wählen (Revolution/Versailles)"/>
+                <HBox spacing="8">
+                    <Button fx:id="nextPhaseBtn" text="Nächste Bauetappe starten"/>
+                </HBox>
 
-                <TableView fx:id="prestigeTable" prefHeight="360">
+                <Separator/>
+
+                <!-- Kategorie-Multiplikatoren -->
+                <Label text="Kategorie-Multiplikatoren" style="-fx-font-weight:bold;"/>
+                <VBox fx:id="catMultipliersBox" spacing="6"/>
+
+                <Separator/>
+
+                <Label text="Family Prestige (sum)" style="-fx-font-weight:bold;"/>
+                <TableView fx:id="prestigeTable" prefHeight="240">
                     <columns>
-                        <TableColumn fx:id="familyCol" text="Family" prefWidth="180"/>
-                        <TableColumn fx:id="prestigeCol" text="Prestige" prefWidth="120"/>
+                        <TableColumn fx:id="familyCol"   text="Family"   prefWidth="240"/>
+                        <TableColumn fx:id="prestigeCol" text="Prestige" prefWidth="140"/>
                     </columns>
                 </TableView>
 
