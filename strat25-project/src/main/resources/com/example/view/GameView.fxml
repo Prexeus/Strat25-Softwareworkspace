@@ -3,33 +3,70 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="com.example.controller.GameController"
-      alignment="CENTER" spacing="14" prefWidth="640" prefHeight="360">
-    <padding>
-        <Insets topRightBottomLeft="20"/>
-    </padding>
+<BorderPane xmlns="http://javafx.com/javafx/21"
+    xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.controller.GameController" prefWidth="960" prefHeight="600">
 
-    <children>
-        <Label fx:id="gameNameLabel" style="-fx-font-size:18; -fx-font-weight:bold;"/>
-        <Label fx:id="timeLabel" style="-fx-font-size:16;"/>
+    <!-- Main content placeholder (left/center) -->
+    <center>
+        <StackPane>
+            <Label text="Your main game area goes here"/>
+        </StackPane>
+    </center>
 
-        <HBox spacing="10" alignment="CENTER">
+    <!-- Right info column -->
+    <right>
+        <VBox spacing="10" prefWidth="320">
+            <padding>
+                <Insets topRightBottomLeft="16"/>
+            </padding>
             <children>
-                <Button fx:id="pauseBtn" text="Pause"/>
-                <Button fx:id="resumeBtn" text="Resume"/>
-                <Button fx:id="stopBtn" text="Stop"/>
-            </children>
-        </HBox>
 
-        <HBox spacing="10" alignment="CENTER">
-            <children>
-                <Label text="Speed:"/>
-                <Button fx:id="slowerBtn" text="×0.5"/>
-                <Button fx:id="normalBtn" text="×1.0"/>
-                <Button fx:id="fasterBtn" text="×2"/>
-                <Label fx:id="speedLabel"/>
+                <Label text="Game Info" style="-fx-font-size:16; -fx-font-weight:bold;"/>
+
+                <GridPane hgap="8" vgap="6">
+                    <columnConstraints>
+                        <ColumnConstraints halignment="RIGHT" percentWidth="35"/>
+                        <ColumnConstraints halignment="LEFT" percentWidth="65"/>
+                    </columnConstraints>
+
+                    <children>
+                        <Label text="Game:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                        <Label fx:id="gameNameLabel" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+                        <Label text="Time:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                        <Label fx:id="timeLabel" style="-fx-font-family:monospace;" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+                        <Label text="Speed:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                        <HBox spacing="6" GridPane.rowIndex="2" GridPane.columnIndex="1">
+                            <children>
+                                <Label fx:id="speedLabel" />
+                                <TextField fx:id="speedField" promptText="1.0" prefWidth="80"/>
+                                <Button fx:id="applySpeedBtn" text="Apply"/>
+                            </children>
+                        </HBox>
+
+                    </children>
+                </GridPane>
+
+                <HBox spacing="8">
+                    <Button fx:id="startBtn" text="Start"/>
+                    <Button fx:id="pauseBtn" text="Pause"/>
+                    <Button fx:id="resumeBtn" text="Resume"/>
+                    <Button fx:id="stopBtn" text="Stop"/>
+                </HBox>
+
+                <Separator/>
+
+                <Label text="Family Prestige (sum)" style="-fx-font-weight:bold;"/>
+
+                <TableView fx:id="prestigeTable" prefHeight="360">
+                    <columns>
+                        <TableColumn fx:id="familyCol" text="Family" prefWidth="180"/>
+                        <TableColumn fx:id="prestigeCol" text="Prestige" prefWidth="120"/>
+                    </columns>
+                </TableView>
+
             </children>
-        </HBox>
-    </children>
-</VBox>
+        </VBox>
+    </right>
+</BorderPane>
