@@ -15,6 +15,7 @@ public class Game implements RepositoryItem, Serializable {
     private List<CategoryInterface> categories;
 
     private GameTime gameTime = new GameTime();
+    private BackboneCalculator backboneCalculator = new BackboneCalculator();
 
     private volatile double prestigeMultiplier = 1.0;
 
@@ -54,6 +55,10 @@ public class Game implements RepositoryItem, Serializable {
 
     public void addPrestigeMultiplier(double amount) {
         this.prestigeMultiplier += amount;
+    }
+
+    public BackboneCalculator getBackboneCalculator() {
+        return backboneCalculator;
     }
 
 }

@@ -26,7 +26,7 @@ public class SceneManager {
     }
 
     public void showGame() {
-        String title = (gameService.getGame() != null) ? "Game – " + gameService.getGame().getName() : "Game";
+        String title = (gameService.getGame() != null) ? "Game - " + gameService.getGame().getName() : "Game";
         setScene("/com/example/view/GameView.fxml", title);
     }
 

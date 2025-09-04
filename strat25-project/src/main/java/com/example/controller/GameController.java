@@ -11,10 +11,13 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
+
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -32,34 +35,69 @@ public class GameController {
     }
 
     // --- right column controls
-    @FXML private Label gameNameLabel;
-    @FXML private Label timeLabel;
-    @FXML private Label speedLabel;
-    @FXML private TextField speedField;
-    @FXML private Button applySpeedBtn;
+    @FXML
+    private Label gameNameLabel;
+    @FXML
+    private Label timeLabel;
+    @FXML
+    private Label speedLabel;
+    @FXML
+    private TextField speedField;
+    @FXML
+    private Button applySpeedBtn;
 
-    @FXML private Label multiplierLabel;
-    @FXML private TextField multiplierField;
-    @FXML private Button applyMultiplierBtn;
+    @FXML
+    private Label multiplierLabel;
+    @FXML
+    private TextField multiplierField;
+    @FXML
+    private Button applyMultiplierBtn;
 
-    @FXML private Button startBtn;
-    @FXML private Button pauseBtn;
-    @FXML private Button resumeBtn;
-    @FXML private Button stopBtn;
-    @FXML private Button saveBtn;
+    @FXML
+    private Button startBtn;
+    @FXML
+    private Button pauseBtn;
+    @FXML
+    private Button resumeBtn;
+    @FXML
+    private Button stopBtn;
+    @FXML
+    private Button saveBtn;
 
-    @FXML private ComboBox<String> buildSelect; // Revolution / Versailles
-    @FXML private Button nextPhaseBtn;
+    @FXML
+    private ComboBox<String> buildSelect; // Revolution / Versailles
+    @FXML
+    private Button nextPhaseBtn;
 
-    @FXML private VBox catMultipliersBox;
+    @FXML
+    private VBox catMultipliersBox;
 
     // center: team tabs
-    @FXML private TabPane teamsTabs;
+    @FXML
+    private TabPane teamsTabs;
 
     // right: family prestige table
-    @FXML private TableView<FamilyPrestigeRow> prestigeTable;
-    @FXML private TableColumn<FamilyPrestigeRow, String> familyCol;
-    @FXML private TableColumn<FamilyPrestigeRow, Number> prestigeCol;
+    @FXML
+    private TableView<FamilyPrestigeRow> prestigeTable;
+    @FXML
+    private TableColumn<FamilyPrestigeRow, String> familyCol;
+    @FXML
+    private TableColumn<FamilyPrestigeRow, Number> prestigeCol;
+
+    // ----- NEW: Calculator UI (left/bottom) -----
+    @FXML
+    private Label breadFactorLabel, housingFactorLabel, healthFactorLabel;
+    @FXML
+    private TextField breadFactorField, housingFactorField, healthFactorField;
+    @FXML
+    private Button applyBreadFactorBtn, applyHousingFactorBtn, applyHealthFactorBtn;
+
+    @FXML
+    private TextField trBreadField, trHouse1Field, trHouse2Field, trHealth1Field, trHealth2Field;
+    @FXML
+    private Button calcComputeBtn;
+    @FXML
+    private Label calcResultLabel;
 
     // Build categories (filtered)
     private List<BuildCategory> buildCategories = List.of();
@@ -77,10 +115,12 @@ public class GameController {
             gameNameLabel.setText(g.getName());
             timeLabel.setText(formatSecondsFloor(g.getGameTime().getScaledSeconds()));
             speedLabel.setText(speedText(g.getGameTime().getGameSpeed()));
-            speedField.setPromptText("1.0"); speedField.clear();
+            speedField.setPromptText("1.0");
+            speedField.clear();
 
             multiplierLabel.setText(multiplierText(g.getPrestigeMultiplier()));
-            multiplierField.setPromptText("1.0"); multiplierField.clear();
+            multiplierField.setPromptText("1.0");
+            multiplierField.clear();
         }
 
         // lifecycle
@@ -90,7 +130,8 @@ public class GameController {
         stopBtn.setOnAction(e -> {
             gameService.stopGame();
             sceneManager.showLauncher();
-            if (uiTicker != null) uiTicker.stop();
+            if (uiTicker != null)
+                uiTicker.stop();
         });
 
         // save (läuft auf Logic-Thread; UI via Platform.runLater)
@@ -116,7 +157,8 @@ public class GameController {
         familyCol.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().getFamilyName()));
         prestigeCol.setCellValueFactory(cd -> new SimpleDoubleProperty(cd.getValue().getPrestigeSum()));
         prestigeCol.setCellFactory(tc -> new TableCell<>() {
-            @Override protected void updateItem(Number item, boolean empty) {
+            @Override
+            protected void updateItem(Number item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty || item == null ? "" : String.format("%.2f", item.doubleValue()));
             }
@@ -125,8 +167,7 @@ public class GameController {
         // gather build categories
         buildCategories = findBuildCategories();
         buildSelect.getItems().setAll(
-                buildCategories.stream().map(BuildCategory::getName).collect(Collectors.toList())
-        );
+                buildCategories.stream().map(BuildCategory::getName).collect(Collectors.toList()));
         if (!buildCategories.isEmpty()) {
             buildSelect.getSelectionModel().select(0);
         }
@@ -147,6 +188,9 @@ public class GameController {
             });
         });
 
+        // --- NEW: Calculator wiring ---
+        initCalculatorUi();
+
         // build tabs + first fill
         buildTeamTabs();
         refreshPrestigeTable();
@@ -156,7 +200,8 @@ public class GameController {
         buildCategoryMultiplierControls();
 
         // UI ticker (1s)
-        if (uiTicker != null) uiTicker.stop();
+        if (uiTicker != null)
+            uiTicker.stop();
         uiTicker = new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
             Game game = gameService.getGame();
             if (game != null) {
@@ -193,19 +238,22 @@ public class GameController {
         teamTabControls.clear();
 
         Game g = gameService.getGame();
-        if (g == null || g.getFamilies() == null) return;
+        if (g == null || g.getFamilies() == null)
+            return;
 
         List<CategoryInterface> categories = g.getCategories();
 
         for (Family f : g.getFamilies()) {
-            if (f.getTeams() == null) continue;
+            if (f.getTeams() == null)
+                continue;
             for (Team t : f.getTeams()) {
-                if (t == null) continue;
+                if (t == null)
+                    continue;
 
                 VBox root = new VBox(14);
                 root.setPadding(new Insets(10));
 
-                // Prestige row: "Prestige: <value> [deltaField] [Add]"
+                // Prestige row
                 HBox prestigeRow = new HBox(8);
                 Label prestigeLabel = new Label("Prestige:");
                 Label prestigeValue = new Label(String.format("%.2f", t.getPrestige()));
@@ -232,8 +280,8 @@ public class GameController {
 
                 int row = 0;
                 inflGrid.add(styledSmall("Kategorie", true), 0, row);
-                inflGrid.add(styledSmall("Einfluss",  true), 1, row);
-                inflGrid.add(styledSmall("Anteil",    true), 2, row);
+                inflGrid.add(styledSmall("Einfluss", true), 1, row);
+                inflGrid.add(styledSmall("Anteil", true), 2, row);
                 inflGrid.add(new Label(""), 3, row);
                 inflGrid.add(new Label(""), 4, row);
                 row++;
@@ -244,18 +292,20 @@ public class GameController {
                         c.getInfluenceMap().putIfAbsent(t.getId(), 0.0);
 
                         Label catName = new Label(c.getName());
-                        Label valLbl  = new Label();  valLbl.setStyle("-fx-font-family: monospace;");
-                        Label pctLbl  = new Label();  pctLbl.setStyle("-fx-font-family: monospace;");
+                        Label valLbl = new Label();
+                        valLbl.setStyle("-fx-font-family: monospace;");
+                        Label pctLbl = new Label();
+                        pctLbl.setStyle("-fx-font-family: monospace;");
                         TextField deltaField = new TextField();
                         deltaField.setPromptText("+5 or -2");
                         deltaField.setPrefWidth(80);
                         Button addBtn = new Button("Add");
 
-                        inflGrid.add(catName,    0, row);
-                        inflGrid.add(valLbl,     1, row);
-                        inflGrid.add(pctLbl,     2, row);
+                        inflGrid.add(catName, 0, row);
+                        inflGrid.add(valLbl, 1, row);
+                        inflGrid.add(pctLbl, 2, row);
                         inflGrid.add(deltaField, 3, row);
-                        inflGrid.add(addBtn,     4, row);
+                        inflGrid.add(addBtn, 4, row);
 
                         InfluenceRow ir = new InfluenceRow(c, valLbl, pctLbl, deltaField);
                         influenceRows.add(ir);
@@ -268,7 +318,7 @@ public class GameController {
                 }
                 root.getChildren().add(inflGrid);
 
-                // -------- Build section (for selected build category) --------
+                // Build section
                 Label buildHdr = new Label("Bau – (keine Auswahl)");
                 buildHdr.setStyle("-fx-font-weight: bold;");
                 root.getChildren().add(buildHdr);
@@ -280,22 +330,25 @@ public class GameController {
 
                 int mrow = 0;
                 buildGrid.add(styledSmall("Rohstoff", true), 0, mrow);
-                buildGrid.add(styledSmall("Status",   true), 1, mrow); // "gezahlt/benötigt -> frei"
-                buildGrid.add(new Label(""), 2, mrow); // amount field
-                buildGrid.add(new Label(""), 3, mrow); // Add button
+                buildGrid.add(styledSmall("Status", true), 1, mrow);
+                buildGrid.add(new Label(""), 2, mrow);
+                buildGrid.add(new Label(""), 3, mrow);
                 mrow++;
 
                 List<MaterialRow> materialRows = new ArrayList<>();
                 for (Material mat : Material.values()) {
                     Label matName = new Label(mat.name());
-                    Label status  = new Label(); status.setStyle("-fx-font-family: monospace;");
-                    TextField amount = new TextField(); amount.setPromptText("2"); amount.setPrefWidth(70);
+                    Label status = new Label();
+                    status.setStyle("-fx-font-family: monospace;");
+                    TextField amount = new TextField();
+                    amount.setPromptText("2");
+                    amount.setPrefWidth(70);
                     Button add = new Button("Add");
 
                     buildGrid.add(matName, 0, mrow);
-                    buildGrid.add(status,  1, mrow);
-                    buildGrid.add(amount,  2, mrow);
-                    buildGrid.add(add,     3, mrow);
+                    buildGrid.add(status, 1, mrow);
+                    buildGrid.add(amount, 2, mrow);
+                    buildGrid.add(add, 3, mrow);
 
                     MaterialRow mr = new MaterialRow(mat, status, amount);
                     materialRows.add(mr);
@@ -319,13 +372,19 @@ public class GameController {
         if (!teamsTabs.getTabs().isEmpty()) {
             teamsTabs.getSelectionModel().select(0);
         }
+
+        // --- NEW: Beim Team-Wechsel TR-Eingaben resetten ---
+        teamsTabs.getSelectionModel().selectedItemProperty().addListener((obs, o, n) -> resetCalculatorInputs());
     }
 
-    // -------- Actions (alle Mutationen via Logic-Thread) --------
+    // -------- Actions (Mutationen via Logic-Thread) --------
 
     private void applyTeamPrestigeDelta(Team team, TextField deltaField) {
         String txt = deltaField.getText();
-        if (txt == null || txt.isBlank()) { warn("Enter a number like 12 or -30."); return; }
+        if (txt == null || txt.isBlank()) {
+            warn("Enter a number like 12 or -30.");
+            return;
+        }
         try {
             double v = Double.parseDouble(txt.replace(',', '.'));
             gameService.runOnLogic(() -> team.addPrestige(v));
@@ -337,12 +396,16 @@ public class GameController {
 
     private void applyInfluenceDelta(Team team, InfluenceRow row) {
         String txt = row.deltaField.getText();
-        if (txt == null || txt.isBlank()) { warn("Enter a number like 5 or -2."); return; }
+        if (txt == null || txt.isBlank()) {
+            warn("Enter a number like 5 or -2.");
+            return;
+        }
         try {
             double v = Double.parseDouble(txt.replace(',', '.'));
             gameService.runOnLogic(() -> {
                 Map<Integer, Double> map = row.category.getInfluenceMap();
-                if (!map.containsKey(team.getId())) map.put(team.getId(), 0.0);
+                if (!map.containsKey(team.getId()))
+                    map.put(team.getId(), 0.0);
                 row.category.addInfluence(team, v);
             });
             row.deltaField.clear();
@@ -365,13 +428,15 @@ public class GameController {
         int v;
         try {
             v = Integer.parseInt(txt.trim());
-            if (v <= 0) { warn("Nur positive Mengen einzahlen."); return; }
+            if (v <= 0) {
+                warn("Nur positive Mengen einzahlen.");
+                return;
+            }
         } catch (NumberFormatException nfe) {
             warn("Ungültige Zahl. Beispiel: 2");
             return;
         }
 
-        // Prüfung + Einzahlung AUF dem Logic-Thread (finale Autorität)
         gameService.runOnLogic(() -> {
             int free = calcFree(bc, row.material);
             if (free <= 0) {
@@ -390,7 +455,7 @@ public class GameController {
 
     private int calcFree(BuildCategory bc, Material material) {
         Map<Material, Integer> need = bc.getNeededMaterials();
-        Map<Material, Integer> pay  = bc.getPayedMaterials();
+        Map<Material, Integer> pay = bc.getPayedMaterials();
         int n = need.getOrDefault(material, 0);
         int p = pay.getOrDefault(material, 0);
         return Math.max(n - p, 0);
@@ -398,12 +463,17 @@ public class GameController {
 
     private void applySpeedFromField() {
         Game g = gameService.getGame();
-        if (g == null) return;
+        if (g == null)
+            return;
         String txt = speedField.getText();
-        if (txt == null || txt.isBlank()) { warn("Please enter a positive number for the game speed (e.g., 1.0, 2.0, 0.5)."); return; }
+        if (txt == null || txt.isBlank()) {
+            warn("Please enter a positive number for the game speed (e.g., 1.0, 2.0, 0.5).");
+            return;
+        }
         try {
             double v = Double.parseDouble(txt.replace(',', '.'));
-            if (v <= 0) throw new IllegalArgumentException("Speed must be > 0");
+            if (v <= 0)
+                throw new IllegalArgumentException("Speed must be > 0");
             gameService.runOnLogic(() -> g.getGameTime().setGameSpeed(v));
             speedField.clear();
         } catch (Exception ex) {
@@ -413,12 +483,17 @@ public class GameController {
 
     private void applyMultiplierFromField() {
         Game g = gameService.getGame();
-        if (g == null) return;
+        if (g == null)
+            return;
         String txt = multiplierField.getText();
-        if (txt == null || txt.isBlank()) { warn("Please enter a positive number for the prestige multiplier (e.g., 1.0, 2.0, 0.5)."); return; }
+        if (txt == null || txt.isBlank()) {
+            warn("Please enter a positive number for the prestige multiplier (e.g., 1.0, 2.0, 0.5).");
+            return;
+        }
         try {
             double v = Double.parseDouble(txt.replace(',', '.'));
-            if (v <= 0) throw new IllegalArgumentException("Multiplier must be > 0");
+            if (v <= 0)
+                throw new IllegalArgumentException("Multiplier must be > 0");
             gameService.runOnLogic(() -> g.setPrestigeMultiplier(v));
             multiplierField.clear();
         } catch (Exception ex) {
@@ -429,12 +504,15 @@ public class GameController {
     // -------- Updates --------
 
     private void updateInfluenceRow(InfluenceRow row, Team team, Game game) {
-        if (row == null || team == null || game == null) return;
+        if (row == null || team == null || game == null)
+            return;
         Map<Integer, Double> map = row.category.getInfluenceMap();
-        if (!map.containsKey(team.getId())) map.put(team.getId(), 0.0);
+        if (!map.containsKey(team.getId()))
+            map.put(team.getId(), 0.0);
         double own = map.getOrDefault(team.getId(), 0.0);
         double total = 0.0;
-        for (double v : map.values()) total += v;
+        for (double v : map.values())
+            total += v;
         double pct = (total > 0.0) ? (own / total) * 100.0 : 0.0;
 
         row.valueLabel.setText(String.format("%.2f", own));
@@ -465,7 +543,7 @@ public class GameController {
 
     private void updateSingleMaterialRow(MaterialRow mr, BuildCategory bc) {
         Map<Material, Integer> need = bc.getNeededMaterials();
-        Map<Material, Integer> pay  = bc.getPayedMaterials();
+        Map<Material, Integer> pay = bc.getPayedMaterials();
         int n = need.getOrDefault(mr.material, 0);
         int p = pay.getOrDefault(mr.material, 0);
         int free = Math.max(n - p, 0);
@@ -479,14 +557,17 @@ public class GameController {
         catMultiplierRows.clear();
 
         Game g = gameService.getGame();
-        if (g == null || g.getCategories() == null) return;
+        if (g == null || g.getCategories() == null)
+            return;
 
         for (CategoryInterface ci : g.getCategories()) {
             HBox row = new HBox(8);
             Label name = new Label(ci.getName());
-            Label cur  = new Label(multiplierText(ci.getPrestigeMultiplier()));
+            Label cur = new Label(multiplierText(ci.getPrestigeMultiplier()));
             cur.setStyle("-fx-font-family: monospace;");
-            TextField inp = new TextField(); inp.setPromptText("1.0"); inp.setPrefWidth(80);
+            TextField inp = new TextField();
+            inp.setPromptText("1.0");
+            inp.setPrefWidth(80);
             Button apply = new Button("Apply");
 
             row.getChildren().addAll(name, cur, inp, apply);
@@ -502,10 +583,14 @@ public class GameController {
 
     private void applyCategoryMultiplier(CategoryMultiplierRow cmr) {
         String txt = cmr.input.getText();
-        if (txt == null || txt.isBlank()) { warn("Bitte einen positiven Multiplikator eingeben (z. B. 1.0, 2.0, 0.5)."); return; }
+        if (txt == null || txt.isBlank()) {
+            warn("Bitte einen positiven Multiplikator eingeben (z. B. 1.0, 2.0, 0.5).");
+            return;
+        }
         try {
             double v = Double.parseDouble(txt.replace(',', '.'));
-            if (v <= 0) throw new IllegalArgumentException("Multiplier must be > 0");
+            if (v <= 0)
+                throw new IllegalArgumentException("Multiplier must be > 0");
             gameService.runOnLogic(() -> cmr.category.setPrestigeMultiplier(v));
             cmr.input.clear();
         } catch (Exception ex) {
@@ -513,37 +598,185 @@ public class GameController {
         }
     }
 
+    // -------- Calculator helpers --------
+
+    private void initCalculatorUi() {
+        BackboneCalculator calc = getCalc();
+        if (calc != null) {
+            breadFactorLabel.setText(formatFactor(calc.getBreadFactor()));
+            housingFactorLabel.setText(formatFactor(calc.getHousingFactor()));
+            healthFactorLabel.setText(formatFactor(calc.getHealthFactor()));
+        }
+        // Apply handlers for factors
+        applyBreadFactorBtn.setOnAction(e -> applyBreadFactor());
+        breadFactorField.setOnAction(e -> applyBreadFactor());
+
+        applyHousingFactorBtn.setOnAction(e -> applyHousingFactor());
+        housingFactorField.setOnAction(e -> applyHousingFactor());
+
+        applyHealthFactorBtn.setOnAction(e -> applyHealthFactor());
+        healthFactorField.setOnAction(e -> applyHealthFactor());
+
+        // Compute handlers for TR inputs
+        calcComputeBtn.setOnAction(e -> recalcCalculator());
+        trBreadField.setOnAction(e -> recalcCalculator());
+        trHouse1Field.setOnAction(e -> recalcCalculator());
+        trHouse2Field.setOnAction(e -> recalcCalculator());
+        trHealth1Field.setOnAction(e -> recalcCalculator());
+        trHealth2Field.setOnAction(e -> recalcCalculator());
+
+        // Startzustand: leere TR-Felder & kein Ergebnis
+        resetCalculatorInputs();
+    }
+
+    private void applyBreadFactor() {
+        String t = breadFactorField.getText();
+        if (t == null || t.isBlank()) {
+            warn("Bitte Faktor für Brot eingeben (z. B. 1.5).");
+            return;
+        }
+        try {
+            double v = Double.parseDouble(t.replace(',', '.'));
+            gameService.runOnLogic(() -> getCalc().setBreadFactor(v));
+            breadFactorLabel.setText(formatFactor(v));
+            breadFactorField.clear();
+            recalcCalculator();
+        } catch (NumberFormatException ex) {
+            warn("Ungültiger Brot-Faktor (z. B. 1.5).");
+        }
+    }
+
+    private void applyHousingFactor() {
+        String t = housingFactorField.getText();
+        if (t == null || t.isBlank()) {
+            warn("Bitte Faktor für Haus eingeben (z. B. 1.0).");
+            return;
+        }
+        try {
+            double v = Double.parseDouble(t.replace(',', '.'));
+            gameService.runOnLogic(() -> getCalc().setHousingFactor(v));
+            housingFactorLabel.setText(formatFactor(v));
+            housingFactorField.clear();
+            recalcCalculator();
+        } catch (NumberFormatException ex) {
+            warn("Ungültiger Haus-Faktor (z. B. 1.0).");
+        }
+    }
+
+    private void applyHealthFactor() {
+        String t = healthFactorField.getText();
+        if (t == null || t.isBlank()) {
+            warn("Bitte Faktor für Krank eingeben (z. B. 0.75).");
+            return;
+        }
+        try {
+            double v = Double.parseDouble(t.replace(',', '.'));
+            gameService.runOnLogic(() -> getCalc().setHealthFactor(v));
+            healthFactorLabel.setText(formatFactor(v));
+            healthFactorField.clear();
+            recalcCalculator();
+        } catch (NumberFormatException ex) {
+            warn("Ungültiger Krank-Faktor (z. B. 0.75).");
+        }
+    }
+
+    private void resetCalculatorInputs() {
+        if (trBreadField == null)
+            return; // falls FXML noch nicht geladen
+        trBreadField.clear();
+        trHouse1Field.clear();
+        trHouse2Field.clear();
+        trHealth1Field.clear();
+        trHealth2Field.clear();
+        calcResultLabel.setText("—");
+    }
+
+    private void recalcCalculator() {
+        BackboneCalculator calc = getCalc();
+        if (calc == null) {
+            calcResultLabel.setText("—");
+            return;
+        }
+
+        int bread = parseIntOrZero(trBreadField.getText());
+        int h1 = parseIntOrZero(trHouse1Field.getText());
+        int h2 = parseIntOrZero(trHouse2Field.getText());
+        int kr1 = parseIntOrZero(trHealth1Field.getText());
+        int kr2 = parseIntOrZero(trHealth2Field.getText());
+
+        double res = calc.calculateBackboneInfluence(bread, h1, h2, kr1, kr2);
+        String resText = String.format("%.2f", res);
+
+        // UI-Label aktualisieren
+        calcResultLabel.setText(resText);
+
+        // --- NEU: automatisch in die Zwischenablage kopieren ---
+        try {
+            ClipboardContent content = new ClipboardContent();
+            content.putString(resText);
+            Clipboard.getSystemClipboard().setContent(content);
+            // Optional: kleines optisches Feedback? (z.B. Tooltip oder Status-Label)
+        } catch (Exception ignore) {
+            // Falls auf manchen Plattformen nicht erlaubt/verfügbar: still schlucken
+        }
+    }
+
+    private int parseIntOrZero(String t) {
+        if (t == null || t.isBlank())
+            return 0;
+        try {
+            return Integer.parseInt(t.trim());
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    private String formatFactor(double v) {
+        return String.format("× %.2f", v);
+    }
+
+    private BackboneCalculator getCalc() {
+        Game g = gameService.getGame();
+        return (g == null) ? null : g.getBackboneCalculator();
+    }
+
     // -------- helpers --------
 
     private List<BuildCategory> findBuildCategories() {
         Game g = gameService.getGame();
-        if (g == null || g.getCategories() == null) return List.of();
+        if (g == null || g.getCategories() == null)
+            return List.of();
         List<BuildCategory> list = new ArrayList<>();
         for (CategoryInterface ci : g.getCategories()) {
-            if (ci instanceof BuildCategory bc) list.add(bc);
+            if (ci instanceof BuildCategory bc)
+                list.add(bc);
         }
         return list;
     }
 
     private BuildCategory getSelectedBuild() {
         String name = buildSelect.getSelectionModel().getSelectedItem();
-        if (name == null) return null;
+        if (name == null)
+            return null;
         for (BuildCategory bc : buildCategories) {
-            if (name.equals(bc.getName())) return bc;
+            if (name.equals(bc.getName()))
+                return bc;
         }
         return null;
     }
 
     private void refreshPrestigeTable() {
         Game g = gameService.getGame();
-        if (g == null) return;
+        if (g == null)
+            return;
 
         List<FamilyPrestigeRow> rows = new ArrayList<>();
         if (g.getFamilies() != null) {
             for (Family f : g.getFamilies()) {
                 double sum = 0.0;
                 if (f.getTeams() != null) {
-                    for (Team t : f.getTeams()) sum += (t != null ? t.getPrestige() : 0.0);
+                    for (Team t : f.getTeams())
+                        sum += (t != null ? t.getPrestige() : 0.0);
                 }
                 rows.add(new FamilyPrestigeRow(f.getName(), sum));
             }
@@ -558,39 +791,66 @@ public class GameController {
     private static Label styledSmall(String text, boolean bold) {
         Label l = new Label(text);
         StringBuilder sb = new StringBuilder("-fx-font-size: 11;");
-        if (bold) sb.append(" -fx-font-weight: bold;");
+        if (bold)
+            sb.append(" -fx-font-weight: bold;");
         l.setStyle(sb.toString());
         return l;
     }
 
-    private static String speedText(double v) { return String.format("(%.2fx)", v); }
-    private static String multiplierText(double v) { return String.format("(%.2fx)", v); }
+    private static String speedText(double v) {
+        return String.format("(%.2fx)", v);
+    }
+
+    private static String multiplierText(double v) {
+        return String.format("(%.2fx)", v);
+    }
 
     private static String formatSecondsFloor(double scaledSeconds) {
         long s = (long) Math.floor(scaledSeconds);
-        long h = s / 3600; s %= 3600;
-        long m = s / 60;   s %= 60;
+        long h = s / 3600;
+        s %= 3600;
+        long m = s / 60;
+        s %= 60;
         return String.format("%02d:%02d:%02d", h, m, s);
     }
 
-    private static void info(String msg) { show(Alert.AlertType.INFORMATION, "Info", msg); }
-    private static void warn(String msg) { show(Alert.AlertType.WARNING, "Warning", msg); }
-    private static void error(String msg){ show(Alert.AlertType.ERROR, "Error", msg); }
+    private static void info(String msg) {
+        show(Alert.AlertType.INFORMATION, "Info", msg);
+    }
+
+    private static void warn(String msg) {
+        show(Alert.AlertType.WARNING, "Warning", msg);
+    }
+
+    private static void error(String msg) {
+        show(Alert.AlertType.ERROR, "Error", msg);
+    }
+
     private static void show(Alert.AlertType type, String title, String msg) {
         Alert a = new Alert(type);
-        a.setTitle(title); a.setHeaderText(null); a.setContentText(msg); a.showAndWait();
+        a.setTitle(title);
+        a.setHeaderText(null);
+        a.setContentText(msg);
+        a.showAndWait();
     }
 
     // table row for families
     public static class FamilyPrestigeRow {
         private final String familyName;
         private final double prestigeSum;
+
         public FamilyPrestigeRow(String familyName, double prestigeSum) {
             this.familyName = familyName;
             this.prestigeSum = prestigeSum;
         }
-        public String getFamilyName() { return familyName; }
-        public double getPrestigeSum() { return prestigeSum; }
+
+        public String getFamilyName() {
+            return familyName;
+        }
+
+        public double getPrestigeSum() {
+            return prestigeSum;
+        }
     }
 
     // per-team tab bundle
@@ -600,7 +860,7 @@ public class GameController {
         final TextField prestigeDeltaField;
         final List<InfluenceRow> influenceRows;
 
-        final Label buildHeader;            // "Bau – {Name}"
+        final Label buildHeader; // "Bau – {Name}"
         final List<MaterialRow> materialRows;
 
         TeamTab(Team team,
@@ -624,6 +884,7 @@ public class GameController {
         final Label valueLabel;
         final Label percentLabel;
         final TextField deltaField;
+
         InfluenceRow(CategoryInterface category, Label valueLabel, Label percentLabel, TextField deltaField) {
             this.category = category;
             this.valueLabel = valueLabel;
@@ -635,8 +896,9 @@ public class GameController {
     // one material row (build)
     private static class MaterialRow {
         final Material material;
-        final Label statusLabel;   // "gezahlt/benötigt -> frei"
+        final Label statusLabel; // "gezahlt/benötigt -> frei"
         final TextField amountField;
+
         MaterialRow(Material material, Label statusLabel, TextField amountField) {
             this.material = material;
             this.statusLabel = statusLabel;
@@ -649,6 +911,7 @@ public class GameController {
         final CategoryInterface category;
         final Label currentLabel;
         final TextField input;
+
         CategoryMultiplierRow(CategoryInterface category, Label currentLabel, TextField input) {
             this.category = category;
             this.currentLabel = currentLabel;

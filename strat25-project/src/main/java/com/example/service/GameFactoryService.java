@@ -42,9 +42,10 @@ public class GameFactoryService {
         teams.add(new Team("Team 9", 9, SerializableColor.of255(40, 120, 40), familyGreen));
 
         List<CategoryInterface> categorys = new ArrayList<>();
-        categorys.add(new Category("Kategorie 1", teams));
-        categorys.add(new Category("Kategorie 2", teams));
-        categorys.add(new Category("Kategorie 3", teams));
+        categorys.add(new Category("Politischer Einfluss", teams));
+        categorys.add(new Category("Militärische Stärke", teams));
+        categorys.add(new Category("Unruhe", teams));
+        categorys.add(new Category("Rückhalt im Volk", teams));
 
         Map<Material, Double> materialWorths = new HashMap<>();
         materialWorths.put(Material.BAUMSTAEMME, 1.205);

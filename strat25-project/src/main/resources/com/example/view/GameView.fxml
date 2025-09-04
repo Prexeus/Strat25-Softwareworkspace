@@ -7,12 +7,102 @@
             fx:controller="com.example.controller.GameController"
             prefWidth="1200" prefHeight="700">
 
-    <!-- CENTER: nur die Team-Tabs -->
+    <!-- LEFT: Spacer + Backbone-Rechner (am unteren Rand) -->
+    <left>
+        <VBox spacing="8" prefWidth="300">
+            <padding><Insets topRightBottomLeft="12"/></padding>
+            <children>
+                <!-- Spacer schiebt den Rechner nach unten -->
+                <Pane VBox.vgrow="ALWAYS"/>
+
+                <TitledPane text="Backbone-Rechner" expanded="true">
+                    <content>
+                        <VBox spacing="10">
+                            <!-- Faktoren -->
+                            <GridPane hgap="8" vgap="6">
+                                <columnConstraints>
+                                    <ColumnConstraints halignment="RIGHT" percentWidth="35"/>
+                                    <ColumnConstraints halignment="LEFT"  percentWidth="65"/>
+                                </columnConstraints>
+                                <children>
+                                    <Label text="Brot ×" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                                    <HBox spacing="6" GridPane.rowIndex="0" GridPane.columnIndex="1">
+                                        <children>
+                                            <Label fx:id="breadFactorLabel"/>
+                                            <TextField fx:id="breadFactorField" promptText="1.5" prefWidth="70"/>
+                                            <Button fx:id="applyBreadFactorBtn" text="Set"/>
+                                        </children>
+                                    </HBox>
+
+                                    <Label text="Haus ×" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                                    <HBox spacing="6" GridPane.rowIndex="1" GridPane.columnIndex="1">
+                                        <children>
+                                            <Label fx:id="housingFactorLabel"/>
+                                            <TextField fx:id="housingFactorField" promptText="1.0" prefWidth="70"/>
+                                            <Button fx:id="applyHousingFactorBtn" text="Set"/>
+                                        </children>
+                                    </HBox>
+
+                                    <Label text="Krank ×" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                                    <HBox spacing="6" GridPane.rowIndex="2" GridPane.columnIndex="1">
+                                        <children>
+                                            <Label fx:id="healthFactorLabel"/>
+                                            <TextField fx:id="healthFactorField" promptText="0.75" prefWidth="70"/>
+                                            <Button fx:id="applyHealthFactorBtn" text="Set"/>
+                                        </children>
+                                    </HBox>
+                                </children>
+                            </GridPane>
+
+                            <Separator/>
+
+                            <!-- TR-Eingaben -->
+                            <GridPane hgap="8" vgap="6">
+                                <columnConstraints>
+                                    <ColumnConstraints halignment="RIGHT" percentWidth="35"/>
+                                    <ColumnConstraints halignment="LEFT"  percentWidth="65"/>
+                                </columnConstraints>
+                                <children>
+                                    <Label text="Brot"  GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                                    <TextField fx:id="trBreadField"  promptText="" prefWidth="80"
+                                               GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+                                    <Label text="Haus1" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                                    <TextField fx:id="trHouse1Field" promptText="" prefWidth="80"
+                                               GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+                                    <Label text="Haus2" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                                    <TextField fx:id="trHouse2Field" promptText="" prefWidth="80"
+                                               GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+                                    <Label text="Krank1" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                                    <TextField fx:id="trHealth1Field" promptText="" prefWidth="80"
+                                               GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+                                    <Label text="Krank2" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+                                    <TextField fx:id="trHealth2Field" promptText="" prefWidth="80"
+                                               GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+                                </children>
+                            </GridPane>
+
+                            <HBox spacing="8">
+                                <Button fx:id="calcComputeBtn" text="Berechnen"/>
+                                <Label text="Ergebnis:"/>
+                                <Label fx:id="calcResultLabel" style="-fx-font-family:monospace;"/>
+                            </HBox>
+                        </VBox>
+                    </content>
+                </TitledPane>
+            </children>
+        </VBox>
+    </left>
+
+    <!-- CENTER: Team-Tabs -->
     <center>
         <TabPane fx:id="teamsTabs" tabClosingPolicy="UNAVAILABLE"/>
     </center>
 
-    <!-- RIGHT: Info column -->
+    <!-- RIGHT: Info column (unverändert außer Breite) -->
     <right>
         <VBox spacing="10" prefWidth="460">
             <padding><Insets topRightBottomLeft="16"/></padding>
@@ -60,14 +150,12 @@
                     <Button fx:id="stopBtn"   text="Stop"/>
                 </HBox>
 
-                <!-- Save button (normal save) -->
                 <HBox spacing="8" alignment="CENTER_RIGHT">
                     <Button fx:id="saveBtn" text="Save"/>
                 </HBox>
 
                 <Separator/>
 
-                <!-- Bau-Auswahl + nächste Etappe -->
                 <Label text="Bau-Auswahl" style="-fx-font-weight:bold;"/>
                 <ComboBox fx:id="buildSelect" promptText="Bauspiel wählen (Revolution/Versailles)"/>
                 <HBox spacing="8">
@@ -76,7 +164,6 @@
 
                 <Separator/>
 
-                <!-- Kategorie-Multiplikatoren -->
                 <Label text="Kategorie-Multiplikatoren" style="-fx-font-weight:bold;"/>
                 <VBox fx:id="catMultipliersBox" spacing="6"/>
 
