@@ -63,6 +63,8 @@ public class GameController {
     private Button stopBtn;
     @FXML
     private Button saveBtn;
+    @FXML 
+    private Button openControlBtn;
 
     @FXML
     private ComboBox<String> buildSelect; // Revolution / Versailles
@@ -146,6 +148,10 @@ public class GameController {
                 gameService.resumeGame();
             }
         }));
+
+        // in initialize() – nach uiTicker.play() o.ä. ist auch ok, Hauptsache gesetzt:
+        openControlBtn.setOnAction(e -> sceneManager.showControlWindow());
+
 
         // speed / multiplier (Mutationen auf Logic-Thread)
         applySpeedBtn.setOnAction(e -> applySpeedFromField());

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.example.controller.ControlController"
+      spacing="10">
+    <padding><Insets topRightBottomLeft="12"/></padding>
+
+    <children>
+        <Label text="Steuerfenster" style="-fx-font-size:18; -fx-font-weight:bold;"/>
+
+        <HBox spacing="8">
+            <Button text="Result öffnen"     onAction="#onOpenResult"/>
+            <Button text="Result Vollbild"    onAction="#onToggleFullscreen"/>
+            <Button text="Result ausblenden"  onAction="#onHideResult"/>
+            <!-- NEU: -->
+            <Button text="Result minimieren"  onAction="#onMinimizeResult"/>
+            <Button text="Steuer minimieren"  onAction="#onMinimizeControl"/>
+        </HBox>
+
+
+        <Separator/>
+
+        <Label text="Anzuzeigende Kategorien" style="-fx-font-weight:bold;"/>
+        <ScrollPane fitToWidth="true" prefHeight="260">
+            <content>
+                <VBox fx:id="categoryBox" spacing="6"/>
+            </content>
+        </ScrollPane>
+
+        <CheckBox fx:id="endscoreCheckBox" text="Endscores anzeigen" selected="true"/>
+
+        <HBox spacing="8">
+            <Button text="Übernehmen" onAction="#onApplyVisibility"/>
+            <Label fx:id="statusLabel" style="-fx-font-size:11; -fx-text-fill:#666;"/>
+        </HBox>
+    </children>
+</VBox>

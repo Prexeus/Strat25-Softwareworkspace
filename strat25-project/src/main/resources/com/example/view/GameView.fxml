@@ -152,6 +152,7 @@
 
                 <HBox spacing="8" alignment="CENTER_RIGHT">
                     <Button fx:id="saveBtn" text="Save"/>
+                    <Button fx:id="openControlBtn" text="Steuerfenster öffnen"/>
                 </HBox>
 
                 <Separator/>

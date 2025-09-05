@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.*?>
+
+<GridPane xmlns="http://javafx.com/javafx/21"
+          xmlns:fx="http://javafx.com/fxml/1"
+          fx:controller="com.example.controller.ResultController"
+          hgap="0" vgap="0">
+
+    <columnConstraints>
+        <ColumnConstraints percentWidth="40"/>
+        <ColumnConstraints percentWidth="60"/>
+    </columnConstraints>
+
+    <!-- 60% oben (Bauspiel), 40% unten (Endscore) -->
+    <rowConstraints>
+        <RowConstraints percentHeight="50"/>
+        <RowConstraints percentHeight="50"/>
+    </rowConstraints>
+
+    <!-- Linker Bereich (spannt beide Reihen) -->
+    <VBox GridPane.columnIndex="0" GridPane.rowIndex="0" GridPane.rowSpan="2"
+          spacing="10" fillWidth="true">
+        <padding><Insets topRightBottomLeft="12"/></padding>
+        <Label text="Linker Bereich"/>
+    </VBox>
+
+    <!-- Rechter Bereich oben -->
+    <VBox GridPane.columnIndex="1" GridPane.rowIndex="0"
+          spacing="10" fillWidth="true">
+        <padding><Insets topRightBottomLeft="12"/></padding>
+
+        <Label fx:id="activeBuildLabel" style="-fx-font-size:20; -fx-font-weight:bold;" text="—"/>
+        <Label fx:id="phaseTitleLabel"  style="-fx-font-size:16;" text="—"/>
+
+        <StackPane fx:id="imageHolder"
+                   VBox.vgrow="ALWAYS"
+                   maxWidth="Infinity"
+                   minHeight="240"
+                   prefHeight="480">
+            <children>
+                <ImageView fx:id="phaseImageView"
+                           preserveRatio="true"
+                           smooth="true"
+                           cache="true"
+                           pickOnBounds="true"/>
+            </children>
+        </StackPane>
+
+        <TitledPane text="Benötigte Ressourcen" expanded="true">
+            <content>
+                <ListView fx:id="materialsList" prefHeight="140"/>
+            </content>
+        </TitledPane>
+    </VBox>
+
+    <!-- Rechter Bereich unten: Endscore -->
+    <VBox fx:id="rightBottomBox"
+          GridPane.columnIndex="1" GridPane.rowIndex="1"
+          spacing="10" fillWidth="true">
+        <padding><Insets topRightBottomLeft="12"/></padding>
+        <Label text="Endscore (Platzhalter)"/>
+    </VBox>
+
+</GridPane>

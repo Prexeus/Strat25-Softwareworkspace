@@ -3,6 +3,7 @@ package com.example.model;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.Serializable;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,44 +22,103 @@ public class BuildCategory implements CategoryInterface, Serializable {
     private final Map<Material, Integer> payedMaterialsMap  = new EnumMap<>(Material.class);
     private final Map<Integer, Double>   influenceMap       = new ConcurrentHashMap<>();
 
-    private final Map<Material, Double> materialWorths; // serialisierbar (HashMap/EnumMap)
-    private final String resourcePath;                  // z.B. "/com/example/csv/revolution.csv"
-    private transient Path csvPath;                     // NICHT serialisieren
+    // Wertigkeiten (serialisierbar)
+    private final Map<Material, Double> materialWorths;
+
+    // CSV-Quelle
+    private final String resourcePath;   // z.B. "/com/example/csv/revolution.csv"  (persistiert)
+    private transient Path csvPath;      // Dateisystempfad (nicht persistiert)
+
+    // Bilder-Basisordner für Phasen (persistiert)
+    private final String imagesResourceBase; // z.B. "/com/example/images/revolution"
+    private transient Path imagesDirPath;    // Dateisystem-Ordner (nicht persistiert)
+
+    // OPTIONAL: Kategoriensymbol / Titelbild (persistiert)
+    // Kann ein Classpath-Resource-Pfad ("/.../icon.png"), eine absolute URL ("https://...") oder ein Dateisystempfad sein.
+    private final String imageUrlSpec;
+
+    // aktueller Etappen-Titel (aus Spalte 0)
+    private String currentPhaseTitle = null;
+
+    // --------- Konstruktoren ---------
 
     public BuildCategory(String name,
                          Collection<Team> teams,
-                         String resourcePath,
-                         Map<Material, Double> materialWorths) {
-        this(name, teams, resourcePath, null, materialWorths);
+                         String csvResourcePath,
+                         Map<Material, Double> materialWorths,
+                         String imagesResourceBase,
+                         String imageUrlSpec) {
+        this(name, teams, csvResourcePath, null, materialWorths, imagesResourceBase, null, imageUrlSpec);
     }
 
     public BuildCategory(String name,
                          Collection<Team> teams,
-                         String resourcePath,
-                         Path csvPath,
-                         Map<Material, Double> materialWorths) {
+                         String csvResourcePath,
+                         Path csvFilePath,
+                         Map<Material, Double> materialWorths,
+                         String imagesResourceBase,
+                         Path imagesDirPath,
+                         String imageUrlSpec) {
         this.name = name;
-        this.resourcePath = resourcePath;
-        this.csvPath = csvPath; // transient
+        this.resourcePath = csvResourcePath;
+        this.csvPath = csvFilePath; // transient
         this.materialWorths = new HashMap<>(materialWorths);
+        this.imagesResourceBase = imagesResourceBase;
+        this.imagesDirPath = imagesDirPath; // transient
+        this.imageUrlSpec = imageUrlSpec;
+
         for (Team t : teams) influenceMap.put(t.getId(), 0.0);
         resetMaterialMapsToZero();
     }
 
-    @Override public String getName() { return name; }
+    // --------- CategoryInterface ---------
 
+    @Override public String getName() { return name; }
     @Override public Map<Integer, Double> getInfluenceMap() { return influenceMap; }
 
     @Override public void addInfluence(Team team, double influence) {
         influenceMap.merge(team.getId(), influence, Double::sum);
     }
 
-    @Override public double getPrestigeMultiplier() {
-        return prestigeMultiplier;
+    @Override public double getPrestigeMultiplier() { return prestigeMultiplier; }
+    @Override public void setPrestigeMultiplier(double prestigeMultiplier) { this.prestigeMultiplier = prestigeMultiplier; }
+
+    /** Optionales statisches Kategorienbild (z. B. für Listen/Icons). */
+    @Override
+    public Optional<URL> getImageUrl() {
+        if (imageUrlSpec == null || imageUrlSpec.isBlank()) return Optional.empty();
+
+        // 1) Versuche Classpath-Ressource (wenn ein Pfad wie "/com/example/..." übergeben wurde)
+        try {
+            URL cp = getClass().getResource(imageUrlSpec);
+            if (cp != null) return Optional.of(cp);
+        } catch (Exception ignored) {}
+
+        // 2) Versuche als absolute URL (http/https/file etc.)
+        try {
+            return Optional.of(new URL(imageUrlSpec));
+        } catch (Exception ignored) {}
+
+        // 3) Versuche als lokaler Dateipfad
+        try {
+            Path p = Path.of(imageUrlSpec);
+            if (Files.exists(p)) return Optional.of(p.toUri().toURL());
+        } catch (Exception ignored) {}
+
+        return Optional.empty();
     }
 
-    @Override public void setPrestigeMultiplier(double prestigeMultiplier) {
-        this.prestigeMultiplier = prestigeMultiplier;
+    // --------- Public API ---------
+
+    public int getConstructionPhase() { return constructionPhase; }
+
+    /** Etappen-Titel der aktuellen Phase (aus CSV-Spalte 0). */
+    public String getCurrentPhaseTitle() { return currentPhaseTitle; }
+
+    /** Etappen-Titel einer beliebigen Phase (1-basiert), on-demand aus CSV gelesen. */
+    public String getPhaseTitle(int oneBasedPhase) {
+        String[] row = readCsvRow(oneBasedPhase);
+        return (row != null && row.length > 0) ? row[0].trim() : null;
     }
 
     public Map<Material, Integer> getNeededMaterials() { return Collections.unmodifiableMap(neededMaterialsMap); }
@@ -70,15 +130,30 @@ public class BuildCategory implements CategoryInterface, Serializable {
         influenceMap.merge(team.getId(), w * amount, Double::sum);
     }
 
+    /**
+     * Startet die nächste Bauetappe:
+     * - setzt beide Material-Maps auf 0
+     * - liest Zeile {constructionPhase} (1-basiert)
+     * - übernimmt Spalte 0 als Etappen-Titel
+     * - setzt Materialbedarfe aus den Folgespalten
+     */
     public void nextConstructionPhase() {
         constructionPhase++;
         resetMaterialMapsToZero();
-        String[] row = readCsvRow(constructionPhase);
-        if (row == null) return;
 
+        String[] row = readCsvRow(constructionPhase);
+        if (row == null) {
+            currentPhaseTitle = null;
+            return;
+        }
+
+        // Spalte 0 = Etappenname
+        currentPhaseTitle = row.length > 0 ? row[0].trim() : null;
+
+        // Ab Spalte 1 folgen die Materialien in ENUM-Reihenfolge
         Material[] mats = Material.values();
         for (int i = 0; i < mats.length; i++) {
-            int col = 1 + i; // ab Spalte 1
+            int col = 1 + i;
             int val = 0;
             if (col < row.length) {
                 String cell = row[col].trim();
@@ -94,6 +169,42 @@ public class BuildCategory implements CategoryInterface, Serializable {
         }
     }
 
+    /** URL zum Bild der angegebenen Phase (1-basiert), falls vorhanden. */
+    public Optional<URL> getPhaseImageUrl(int oneBasedPhase) {
+        // 1) Classpath-Ordner versuchen
+        if (imagesResourceBase != null) {
+            String base = imagesResourceBase.endsWith("/") ? imagesResourceBase : imagesResourceBase + "/";
+            String res = base + oneBasedPhase + ".png";
+            URL url = getClass().getResource(res);
+            if (url != null) return Optional.of(url);
+        }
+        // 2) Dateisystem-Ordner versuchen
+        if (imagesDirPath != null) {
+            try {
+                Path p = imagesDirPath.resolve(oneBasedPhase + ".png");
+                if (Files.exists(p)) return Optional.of(p.toUri().toURL());
+            } catch (Exception ignored) {}
+        }
+        return Optional.empty();
+    }
+
+    /** URL zum Bild der aktuellen Phase, falls vorhanden. */
+    public Optional<URL> getCurrentPhaseImageUrl() {
+        if (constructionPhase <= 0) return Optional.empty();
+        return getPhaseImageUrl(constructionPhase);
+    }
+
+    /**
+     * Nach dem Laden aus einem Save kannst du die transienten Pfade neu setzen,
+     * falls du im Dateisystem arbeitest.
+     */
+    public void rebindFilesystemPaths(Path newCsvPath, Path newImagesDirPath) {
+        this.csvPath = newCsvPath;
+        this.imagesDirPath = newImagesDirPath;
+    }
+
+    // --------- internals ---------
+
     private void resetMaterialMapsToZero() {
         neededMaterialsMap.clear(); payedMaterialsMap.clear();
         for (Material m : Material.values()) {
@@ -105,13 +216,13 @@ public class BuildCategory implements CategoryInterface, Serializable {
     private String[] readCsvRow(int oneBasedRowIndex) {
         if (oneBasedRowIndex <= 0) return null;
 
-        // 1) expliziter Pfad (zur Laufzeit, nicht persistiert)
+        // 1) expliziter Dateipfad
         if (csvPath != null) {
             try (var br = Files.newBufferedReader(csvPath, StandardCharsets.UTF_8)) {
                 return readRowFromReader(br, oneBasedRowIndex);
             } catch (Exception ignored) { /* fallback */ }
         }
-        // 2) Classpath-Resource (persistierter resourcePath)
+        // 2) Classpath-Ressource
         if (resourcePath != null) {
             try (var in = getClass().getResourceAsStream(resourcePath)) {
                 if (in == null) return null;
