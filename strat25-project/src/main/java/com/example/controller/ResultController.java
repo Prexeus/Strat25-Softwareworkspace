@@ -12,12 +12,10 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
-import javafx.application.Platform;
-import javafx.beans.binding.Bindings;
-import javafx.scene.shape.Rectangle;
 
 import java.net.URL;
 import java.util.*;
@@ -43,10 +41,10 @@ public class ResultController {
     @FXML private VBox rightBottomBox; // Endscore-Bereich
 
     // Zustand
-    private BuildCategory activeBuild;  // aktuell ausgewählte Baukategorie (oder null)
-    private boolean showEndscore;       // vom Control-Fenster gesetzt
+    private BuildCategory activeBuild;        // aktuell ausgewählte Baukategorie (oder null)
+    private boolean showEndscore;             // vom Control-Fenster gesetzt
 
-    // Cache zur Flacker-Vermeidung
+    // Caches zur Flacker-/Wobble-Vermeidung
     private String lastBuildName   = null;
     private int    lastPhase       = -1;
     private String lastPhaseTitle  = null;
@@ -58,15 +56,15 @@ public class ResultController {
     @FXML
     private void initialize() {
         setupImageSizing();
+        setupListViewSizing();
 
-        // Ticker: prüft nur auf Änderungen; keine dauernden setImage()/setText()-Calls
         if (ticker != null) ticker.stop();
         ticker = new Timeline(new KeyFrame(Duration.seconds(1), e -> safeRefresh()));
         ticker.setCycleCount(Timeline.INDEFINITE);
         ticker.play();
     }
 
-    /** Bild sauber auf die Box einschränken (beide Fits + Clip). */
+    /** Bild sauber an den begrenzten Container binden. */
     private void setupImageSizing() {
         if (imageHolder == null || phaseImageView == null) return;
 
@@ -74,21 +72,21 @@ public class ResultController {
         phaseImageView.setSmooth(true);
         phaseImageView.setCache(true);
 
-        // An beide Dimensionen binden -> ImageView bleibt innerhalb der Box
-        // Optional: Deckel (z. B. 4k), damit niemals absurde Größen anfallen.
-        final double MAX_W = 3840, MAX_H = 2160;
-        phaseImageView.fitWidthProperty().bind(
-                Bindings.min(imageHolder.widthProperty(), MAX_W)
-        );
-        phaseImageView.fitHeightProperty().bind(
-                Bindings.min(imageHolder.heightProperty(), MAX_H)
-        );
+        // An Containerbreite/-höhe binden – die StackPane ist im FXML in der Höhe gedeckelt
+        phaseImageView.fitWidthProperty().bind(imageHolder.widthProperty());
+        phaseImageView.fitHeightProperty().bind(imageHolder.heightProperty());
+    }
 
-        // Alles außerhalb der Box wird abgeschnitten (falls nötig)
-        Rectangle clip = new Rectangle();
-        clip.widthProperty().bind(imageHolder.widthProperty());
-        clip.heightProperty().bind(imageHolder.heightProperty());
-        imageHolder.setClip(clip);
+    /** ListView so konfigurieren, dass sie immer alle Items zeigt (ohne Scrollbar). */
+    private void setupListViewSizing() {
+        if (materialsList == null) return;
+
+        // Feste Zellhöhe; damit können wir die Gesamt-Höhe exakt berechnen.
+        materialsList.setFixedCellSize(24);
+
+        // ListView lässt sich von VBox nicht „strecken“, sondern behält ihre Pref-Höhe.
+        materialsList.setMinHeight(Region.USE_PREF_SIZE);
+        materialsList.setMaxHeight(Region.USE_PREF_SIZE);
     }
 
     /** Wird vom SceneManager/ControlController aufgerufen. */
@@ -101,7 +99,7 @@ public class ResultController {
         // nur dann umschalten, wenn sich die aktive Kategorie wirklich ändert
         if (activeBuild != newActive) {
             activeBuild = newActive;
-            // bei aktivem Wechsel alles „ungültig“ setzen, damit nächste Refresh-Runde hart neu rendert
+            // Caches invalidieren → nächste Refresh-Runde rendert hart neu
             lastBuildName = null;
             lastPhase = -1;
             lastPhaseTitle = null;
@@ -136,11 +134,11 @@ public class ResultController {
         String phaseTitle  = (bc != null) ? nullToDash(bc.getCurrentPhaseTitle()) : "—";
 
         if (!Objects.equals(buildName, lastBuildName)) {
-            activeBuildLabel.setText(buildName);
+            if (activeBuildLabel != null) activeBuildLabel.setText(buildName);
             lastBuildName = buildName;
         }
         if (phase != lastPhase || !Objects.equals(phaseTitle, lastPhaseTitle)) {
-            phaseTitleLabel.setText(phaseTitle);
+            if (phaseTitleLabel != null) phaseTitleLabel.setText(phaseTitle);
             lastPhase = phase;
             lastPhaseTitle = phaseTitle;
         }
@@ -166,14 +164,31 @@ public class ResultController {
             lastImageUrl = imgUrl;
         }
 
-        // 3) Ressourcenliste (z. B. "4/8 Baumstämme")
+        // 3) Ressourcenliste (z. B. "4/8 HOLZ")
         List<String> lines = (bc != null) ? buildMaterialsLines(bc) : List.of();
         if (!lines.equals(lastMaterialsLines)) {
             if (materialsList != null) {
                 materialsList.getItems().setAll(lines);
+                resizeMaterialsListToFitContent();
             }
             lastMaterialsLines = lines;
         }
+    }
+
+    /** Setzt die ListView-Höhe so, dass alle Zeilen sichtbar sind (keine Scrollbar). */
+    private void resizeMaterialsListToFitContent() {
+        if (materialsList == null) return;
+
+        double cell = materialsList.getFixedCellSize() > 0
+                ? materialsList.getFixedCellSize()
+                : 24;
+
+        int rows = (materialsList.getItems() != null) ? materialsList.getItems().size() : 0;
+        double newHeight = rows * cell + 2; // +2 px für Borders/Insets
+
+        materialsList.setPrefHeight(newHeight);
+        materialsList.setMinHeight(newHeight);
+        materialsList.setMaxHeight(newHeight);
     }
 
     private static String nullToDash(String s) {
@@ -219,6 +234,5 @@ public class ResultController {
             ticker.stop();
             ticker = null;
         }
-        // Bindings/Clips können bleiben; die Scene wird beim Schließen entsorgt.
     }
 }

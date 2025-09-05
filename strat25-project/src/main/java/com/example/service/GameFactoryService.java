@@ -61,10 +61,10 @@ public class GameFactoryService {
         materialWorths.put(Material.HYMNEN, 0.0536);
 
         CategoryInterface revolution = new BuildCategory(
-                "Revolution", teams, "/com/example/csv/revolution.csv", materialWorths, "/com/example/images/revolution");
+                "Revolution", teams, "/com/example/csv/revolution.csv", materialWorths, "/com/example/images/revolution", "/com/example/images/category/sample.PNG");
 
         CategoryInterface versailles = new BuildCategory(
-                "Versailles", teams, "/com/example/csv/versailles.csv", materialWorths, "/com/example/images/versailles");
+                "Versailles", teams, "/com/example/csv/versailles.csv", materialWorths, "/com/example/images/versailles", "/com/example/images/category/sample.PNG");
 
         categorys.add(revolution);
         categorys.add(versailles);

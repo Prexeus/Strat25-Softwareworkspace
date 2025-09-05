@@ -14,7 +14,7 @@
         <ColumnConstraints percentWidth="60"/>
     </columnConstraints>
 
-    <!-- 60% oben (Bauspiel), 40% unten (Endscore) -->
+    <!-- 50% oben (Bauspiel), 50% unten (Endscore) -->
     <rowConstraints>
         <RowConstraints percentHeight="50"/>
         <RowConstraints percentHeight="50"/>
@@ -35,11 +35,12 @@
         <Label fx:id="activeBuildLabel" style="-fx-font-size:20; -fx-font-weight:bold;" text="—"/>
         <Label fx:id="phaseTitleLabel"  style="-fx-font-size:16;" text="—"/>
 
+        <!-- Bildbereich: bewusst gedeckelt, damit die Tabelle IMMER passt -->
         <StackPane fx:id="imageHolder"
-                   VBox.vgrow="ALWAYS"
-                   maxWidth="Infinity"
-                   minHeight="240"
-                   prefHeight="480">
+                   VBox.vgrow="NEVER"
+                   minHeight="140"
+                   prefHeight="220"
+                   maxHeight="300">
             <children>
                 <ImageView fx:id="phaseImageView"
                            preserveRatio="true"
@@ -49,11 +50,13 @@
             </children>
         </StackPane>
 
-        <TitledPane text="Benötigte Ressourcen" expanded="true">
-            <content>
-                <ListView fx:id="materialsList" prefHeight="140"/>
-            </content>
-        </TitledPane>
+        <!-- Immer sichtbare Tabelle (keine TitledPane/kein Accordion) -->
+        <Label text="Benötigte Ressourcen" style="-fx-font-weight: bold;"/>
+        <!-- Höhe wird im Controller exakt auf die Anzahl der Items gesetzt -->
+        <ListView fx:id="materialsList"
+                  focusTraversable="false"
+                  mouseTransparent="true"
+                  VBox.vgrow="NEVER"/>
     </VBox>
 
     <!-- Rechter Bereich unten: Endscore -->
