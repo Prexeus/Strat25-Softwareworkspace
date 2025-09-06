@@ -27,6 +27,9 @@ public class BuildCategory implements CategoryInterface, Serializable {
     // Einfluss pro Team (Team-ID -> Punkte)
     private final Map<Integer, Double> influenceMap = new ConcurrentHashMap<>();
 
+    // NEU: Lookup TeamId -> Team (ersetzt TeamManager)
+    private final Map<Integer, Team> teamById = new ConcurrentHashMap<>();
+
     // Wertigkeiten (serialisierbar)
     private final Map<Material, Double> materialWorths;
 
@@ -105,6 +108,7 @@ public class BuildCategory implements CategoryInterface, Serializable {
 
         for (Team t : teams) {
             influenceMap.put(t.getId(), 0.0);
+            teamById.put(t.getId(), t); // <— wichtig für späteres Prestige-Update
         }
         resetMaterialMapsToZero();
     }
@@ -118,6 +122,8 @@ public class BuildCategory implements CategoryInterface, Serializable {
     @Override public Map<Integer, Double> getInfluenceMap() { return influenceMap; }
 
     @Override public void addInfluence(Team team, double influence) {
+        if (team == null) return;
+        teamById.putIfAbsent(team.getId(), team); // sicherstellen, dass Team bekannt ist
         influenceMap.merge(team.getId(), influence, Double::sum);
     }
 
@@ -166,8 +172,10 @@ public class BuildCategory implements CategoryInterface, Serializable {
     public Map<Material, Integer> getPayedMaterials()  { return Collections.unmodifiableMap(payedMaterialsMap);  }
 
     public void addMaterial(Team team, Material material, int amount) {
+        if (team == null || material == null || amount == 0) return;
         payedMaterialsMap.merge(material, amount, Integer::sum);
         double w = materialWorths.getOrDefault(material, 0.0);
+        teamById.putIfAbsent(team.getId(), team);
         influenceMap.merge(team.getId(), w * amount, Double::sum);
     }
 
@@ -237,7 +245,7 @@ public class BuildCategory implements CategoryInterface, Serializable {
     public Optional<URL> getCurrentPhaseImageUrl() {
         if (constructionPhase <= 0) return Optional.empty();
         return getPhaseImageUrl(constructionPhase);
-        }
+    }
 
     /**
      * Nach dem Laden aus einem Save kannst du die transienten Pfade neu setzen,
@@ -293,9 +301,38 @@ public class BuildCategory implements CategoryInterface, Serializable {
         return (fullName != null && !fullName.isBlank()) ? fullName : name;
     }
 
-    // TODO
+    // Anteilig insg. 40 Prestige für die Teams,
+    // + je 5 Prestige für die TOP 3 Teams
     @Override
-    public void addTimedPrestige(double prestigeMultiplier) {
-        
+    public void addTimedPrestige(double prestigeMultiplierFromGame) {
+        // kombinierten Multiplikator (Game * Category)
+        double multiplier = prestigeMultiplierFromGame * this.prestigeMultiplier;
+        if (multiplier <= 0) return;
+
+        // 1) 40 Prestige anteilig nach Influence verteilen
+        double totalInfluence = influenceMap.values().stream()
+                .mapToDouble(Double::doubleValue)
+                .sum();
+
+        if (totalInfluence > 0) {
+            double pool = 40.0 * multiplier;
+            for (Map.Entry<Integer, Double> e : influenceMap.entrySet()) {
+                Team team = teamById.get(e.getKey());
+                if (team == null) continue;
+                double share = e.getValue() / totalInfluence;
+                team.addPrestige(share * pool);
+            }
+        }
+
+        // 2) Top 3 Teams: je +5 Prestige
+        influenceMap.entrySet().stream()
+                .sorted(Map.Entry.<Integer, Double>comparingByValue(Comparator.reverseOrder()))
+                .limit(3)
+                .forEach(e -> {
+                    Team team = teamById.get(e.getKey());
+                    if (team != null) {
+                        team.addPrestige(5.0 * multiplier);
+                    }
+                });
     }
 }
