@@ -50,4 +50,8 @@ public class Team implements Serializable {
     public void addPrestige(double prestige) {
         this.prestige += prestige;
     }
+
+    public void setSerializableColor(SerializableColor color) {
+        this.color = color;
+    }
 }

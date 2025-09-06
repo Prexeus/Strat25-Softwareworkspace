@@ -28,21 +28,19 @@ public class GameFactoryService {
 
 
         // Rot-Familie → rötliche Farbtöne
-        teams.add(new Team("Team 1", 1, SerializableColor.fromHex("#28509c"), familyRed));
-        teams.add(new Team("Team 2", 2, SerializableColor.fromHex("#20699e"), familyRed));
-        teams.add(new Team("Team 3", 3, SerializableColor.fromHex("#2b839e"), familyRed));
+        teams.add(new Team("Team 1", 1, SerializableColor.fromHex("#952929"), familyRed));
+        teams.add(new Team("Team 2", 2, SerializableColor.fromHex("#a0482c"), familyRed));
+        teams.add(new Team("Team 3", 3, SerializableColor.fromHex("#965d28"), familyRed));
 
         // Blau-Familie → bläuliche Farbtöne
-        teams.add(new Team("Team 4", 4, SerializableColor.fromHex("#5f5f5f"), familyBlue));
-        teams.add(new Team("Team 5", 5, SerializableColor.fromHex("#797978"), familyBlue));
-        teams.add(new Team("Team 6", 6, SerializableColor.fromHex("#9f9fa0"), familyBlue));
+        teams.add(new Team("Team 4", 4, SerializableColor.fromHex("#28509c"), familyBlue));
+        teams.add(new Team("Team 5", 5, SerializableColor.fromHex("#20699e"), familyBlue));
+        teams.add(new Team("Team 6", 6, SerializableColor.fromHex("#2b839e"), familyBlue));
 
         // Grün-Familie → grünliche Farbtöne
-        teams.add(new Team("Team 7", 7, SerializableColor.fromHex("#952929"), familyGreen));
-        teams.add(new Team("Team 8", 8, SerializableColor.fromHex("#a0482c"), familyGreen));
-        teams.add(new Team("Team 9", 9, SerializableColor.fromHex("#965d28"), familyGreen));
-
-
+        teams.add(new Team("Team 7", 7, SerializableColor.fromHex("#5f5f5f"), familyGreen));
+        teams.add(new Team("Team 8", 8, SerializableColor.fromHex("#797978"), familyGreen));
+        teams.add(new Team("Team 9", 9, SerializableColor.fromHex("#9f9fa0"), familyGreen));
 
         List<CategoryInterface> categorys = new ArrayList<>();
         categorys.add(new Category("Politischer Einfluss", teams, "/com/example/images/category/politik.png"));
