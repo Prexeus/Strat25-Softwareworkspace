@@ -26,7 +26,7 @@ public class Game implements RepositoryItem, Serializable {
     }
 
     public void addTimedPrestige() {
-
+        categories.forEach(cat -> cat.addTimedPrestige(prestigeMultiplier));
     }
 
     public String getName() {

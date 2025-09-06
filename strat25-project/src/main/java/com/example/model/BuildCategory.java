@@ -293,4 +293,9 @@ public class BuildCategory implements CategoryInterface, Serializable {
         return (fullName != null && !fullName.isBlank()) ? fullName : name;
     }
 
+    // TODO
+    @Override
+    public void addTimedPrestige(double prestigeMultiplier) {
+        
+    }
 }

@@ -11,4 +11,5 @@ public interface CategoryInterface {
     double getPrestigeMultiplier();
     void setPrestigeMultiplier(double prestigeMultiplier);
     Optional<URL> getImageUrl();
+    void addTimedPrestige(double prestigeMultiplier);
 }

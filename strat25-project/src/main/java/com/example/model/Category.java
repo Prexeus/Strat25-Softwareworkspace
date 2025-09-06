@@ -89,4 +89,10 @@ public class Category implements Serializable, CategoryInterface {
 
         return Optional.empty();
     }
+
+    // TODO
+    @Override
+    public void addTimedPrestige(double prestigeMultiplier) {
+        
+    }
 }
