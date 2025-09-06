@@ -13,14 +13,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BuildCategory implements CategoryInterface, Serializable {
     private static final long serialVersionUID = 1L;
 
+    // Basis
     private final String name;
+    private final String fullName;           // NEU: ausführlicher Anzeigename
     private int constructionPhase = 0;
 
     private double prestigeMultiplier = 1.5;
 
+    // Materialbedarf / Einzahlungen
     private final Map<Material, Integer> neededMaterialsMap = new EnumMap<>(Material.class);
     private final Map<Material, Integer> payedMaterialsMap  = new EnumMap<>(Material.class);
-    private final Map<Integer, Double>   influenceMap       = new ConcurrentHashMap<>();
+
+    // Einfluss pro Team (Team-ID -> Punkte)
+    private final Map<Integer, Double> influenceMap = new ConcurrentHashMap<>();
 
     // Wertigkeiten (serialisierbar)
     private final Map<Material, Double> materialWorths;
@@ -40,17 +45,19 @@ public class BuildCategory implements CategoryInterface, Serializable {
     // aktueller Etappen-Titel (aus Spalte 0)
     private String currentPhaseTitle = null;
 
-    // --------- Konstruktoren ---------
+    // --------- Öffentliche Konstruktoren (Rückwärts-kompatibel) ---------
 
+    /** Alter bequemer Konstruktor (ohne fullName) – delegiert auf den neuen und setzt fullName = name. */
     public BuildCategory(String name,
                          Collection<Team> teams,
                          String csvResourcePath,
                          Map<Material, Double> materialWorths,
                          String imagesResourceBase,
                          String imageUrlSpec) {
-        this(name, teams, csvResourcePath, null, materialWorths, imagesResourceBase, null, imageUrlSpec);
+        this(name, name, teams, csvResourcePath, null, materialWorths, imagesResourceBase, null, imageUrlSpec);
     }
 
+    /** Alter Voll-Konstruktor (ohne fullName) – delegiert auf den neuen und setzt fullName = name. */
     public BuildCategory(String name,
                          Collection<Team> teams,
                          String csvResourcePath,
@@ -59,21 +66,55 @@ public class BuildCategory implements CategoryInterface, Serializable {
                          String imagesResourceBase,
                          Path imagesDirPath,
                          String imageUrlSpec) {
-        this.name = name;
+        this(name, name, teams, csvResourcePath, csvFilePath, materialWorths, imagesResourceBase, imagesDirPath, imageUrlSpec);
+    }
+
+    // --------- NEU: Konstruktoren mit fullName ---------
+
+    /** Neuer bequemer Konstruktor (Classpath-CSV). */
+    public BuildCategory(String name,
+                         String fullName,
+                         Collection<Team> teams,
+                         String csvResourcePath,
+                         Map<Material, Double> materialWorths,
+                         String imagesResourceBase,
+                         String imageUrlSpec) {
+        this(name, fullName, teams, csvResourcePath, null, materialWorths, imagesResourceBase, null, imageUrlSpec);
+    }
+
+    /** Neuer Voll-Konstruktor (Dateisystem-CSV optional). */
+    public BuildCategory(String name,
+                         String fullName,
+                         Collection<Team> teams,
+                         String csvResourcePath,
+                         Path csvFilePath,
+                         Map<Material, Double> materialWorths,
+                         String imagesResourceBase,
+                         Path imagesDirPath,
+                         String imageUrlSpec) {
+        this.name = Objects.requireNonNull(name, "name");
+        this.fullName = (fullName == null || fullName.isBlank()) ? name : fullName;
+
         this.resourcePath = csvResourcePath;
         this.csvPath = csvFilePath; // transient
-        this.materialWorths = new HashMap<>(materialWorths);
+
+        this.materialWorths = new HashMap<>(Objects.requireNonNull(materialWorths, "materialWorths"));
         this.imagesResourceBase = imagesResourceBase;
         this.imagesDirPath = imagesDirPath; // transient
         this.imageUrlSpec = imageUrlSpec;
 
-        for (Team t : teams) influenceMap.put(t.getId(), 0.0);
+        for (Team t : teams) {
+            influenceMap.put(t.getId(), 0.0);
+        }
         resetMaterialMapsToZero();
     }
 
     // --------- CategoryInterface ---------
 
     @Override public String getName() { return name; }
+    /** Nicht im Interface – darf aber zusätzlich angeboten werden. */
+    public String getFullName() { return fullName; }
+
     @Override public Map<Integer, Double> getInfluenceMap() { return influenceMap; }
 
     @Override public void addInfluence(Team team, double influence) {
@@ -88,18 +129,18 @@ public class BuildCategory implements CategoryInterface, Serializable {
     public Optional<URL> getImageUrl() {
         if (imageUrlSpec == null || imageUrlSpec.isBlank()) return Optional.empty();
 
-        // 1) Versuche Classpath-Ressource (wenn ein Pfad wie "/com/example/..." übergeben wurde)
+        // 1) Classpath-Ressource (wenn z. B. "/com/example/..." übergeben wurde)
         try {
             URL cp = getClass().getResource(imageUrlSpec);
             if (cp != null) return Optional.of(cp);
         } catch (Exception ignored) {}
 
-        // 2) Versuche als absolute URL (http/https/file etc.)
+        // 2) Absolute URL (http/https/file etc.)
         try {
             return Optional.of(new URL(imageUrlSpec));
         } catch (Exception ignored) {}
 
-        // 3) Versuche als lokaler Dateipfad
+        // 3) Lokaler Dateipfad
         try {
             Path p = Path.of(imageUrlSpec);
             if (Files.exists(p)) return Optional.of(p.toUri().toURL());
@@ -158,10 +199,14 @@ public class BuildCategory implements CategoryInterface, Serializable {
             if (col < row.length) {
                 String cell = row[col].trim();
                 if (!cell.isEmpty()) {
-                    try { val = Integer.parseInt(cell); }
-                    catch (NumberFormatException e1) {
-                        try { val = (int)Math.round(Double.parseDouble(cell.replace(',', '.'))); }
-                        catch (NumberFormatException ignored) { val = 0; }
+                    try {
+                        val = Integer.parseInt(cell);
+                    } catch (NumberFormatException e1) {
+                        try {
+                            val = (int) Math.round(Double.parseDouble(cell.replace(',', '.')));
+                        } catch (NumberFormatException ignored) {
+                            val = 0;
+                        }
                     }
                 }
             }
@@ -192,7 +237,7 @@ public class BuildCategory implements CategoryInterface, Serializable {
     public Optional<URL> getCurrentPhaseImageUrl() {
         if (constructionPhase <= 0) return Optional.empty();
         return getPhaseImageUrl(constructionPhase);
-    }
+        }
 
     /**
      * Nach dem Laden aus einem Save kannst du die transienten Pfade neu setzen,
@@ -206,7 +251,8 @@ public class BuildCategory implements CategoryInterface, Serializable {
     // --------- internals ---------
 
     private void resetMaterialMapsToZero() {
-        neededMaterialsMap.clear(); payedMaterialsMap.clear();
+        neededMaterialsMap.clear();
+        payedMaterialsMap.clear();
         for (Material m : Material.values()) {
             neededMaterialsMap.put(m, 0);
             payedMaterialsMap.put(m, 0);
@@ -242,4 +288,9 @@ public class BuildCategory implements CategoryInterface, Serializable {
         }
         return null;
     }
+
+    public String getDisplayName() {
+        return (fullName != null && !fullName.isBlank()) ? fullName : name;
+    }
+
 }

@@ -1,22 +1,31 @@
 package com.example.controller;
 
 import com.example.model.BuildCategory;
+import com.example.model.CategoryInterface;
+import com.example.model.Family;
 import com.example.model.Game;
 import com.example.model.Material;
+import com.example.model.Team;
 import com.example.service.GameService;
 import com.example.view.SceneManager;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.NumberBinding;
 import javafx.fxml.FXML;
+import javafx.geometry.HPos;
+import javafx.geometry.VPos;
+import javafx.scene.Node;
+import javafx.scene.chart.PieChart;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -32,31 +41,55 @@ public class ResultController {
         this.sceneManager = sceneManager;
     }
 
-    // FXML
+    // ===== FXML (Hauptbereich rechts) =====
     @FXML private Label activeBuildLabel;
     @FXML private Label phaseTitleLabel;
+
     @FXML private StackPane imageHolder;
     @FXML private ImageView phaseImageView;
+
+    @FXML private StackPane pieHolder;
+    @FXML private PieChart influencePieChart;
+    @FXML private ImageView pieCenterImage;
+
     @FXML private ListView<String> materialsList;
     @FXML private VBox rightBottomBox; // Endscore-Bereich
 
-    // Zustand
-    private BuildCategory activeBuild;        // aktuell ausgewählte Baukategorie (oder null)
-    private boolean showEndscore;             // vom Control-Fenster gesetzt
+    // ===== FXML (linke Seite: extra Charts) =====
+    @FXML private GridPane extraChartsGrid;
 
-    // Caches zur Flacker-/Wobble-Vermeidung
+    // ===== Zustand =====
+    private BuildCategory activeBuild;          // ausgewählte Baukategorie (oder null)
+    private boolean showEndscore;
+
+    // Caches (gegen Flackern)
     private String lastBuildName   = null;
     private int    lastPhase       = -1;
     private String lastPhaseTitle  = null;
     private String lastImageUrl    = null;
+    private String lastCenterImgUrl = null;
     private List<String> lastMaterialsLines = List.of();
+    private String lastPieSignature = "";
+
+    // Extra-Charts Verwaltung + Caches
+    private List<String> lastExtraNames = List.of();
+    private final Map<String, PieChart>   extraChartsByName       = new LinkedHashMap<>();
+    private final Map<String, ImageView>  extraIconsByName        = new LinkedHashMap<>();
+    private final Map<String, String>     extraPieSignatureByName = new HashMap<>();
+    private final Map<String, String>     extraIconUrlByName      = new HashMap<>();
+
+    // Overlay, wenn keine Daten im Haupt-Pie
+    private Label pieEmptyOverlay;
 
     private Timeline ticker;
 
+    // ===== Lifecycle =====
     @FXML
     private void initialize() {
         setupImageSizing();
         setupListViewSizing();
+        setupMainPieChartSizingAndStyle();
+        setupPieEmptyOverlay();
 
         if (ticker != null) ticker.stop();
         ticker = new Timeline(new KeyFrame(Duration.seconds(1), e -> safeRefresh()));
@@ -64,78 +97,110 @@ public class ResultController {
         ticker.play();
     }
 
-    /** Bild sauber an den begrenzten Container binden. */
+    // ===== Setup: Bild =====
     private void setupImageSizing() {
         if (imageHolder == null || phaseImageView == null) return;
-
         phaseImageView.setPreserveRatio(true);
         phaseImageView.setSmooth(true);
         phaseImageView.setCache(true);
-
-        // An Containerbreite/-höhe binden – die StackPane ist im FXML in der Höhe gedeckelt
         phaseImageView.fitWidthProperty().bind(imageHolder.widthProperty());
         phaseImageView.fitHeightProperty().bind(imageHolder.heightProperty());
     }
 
-    /** ListView so konfigurieren, dass sie immer alle Items zeigt (ohne Scrollbar). */
+    // ===== Setup: Liste (Materialien) =====
     private void setupListViewSizing() {
         if (materialsList == null) return;
-
-        // Feste Zellhöhe; damit können wir die Gesamt-Höhe exakt berechnen.
-        materialsList.setFixedCellSize(24);
-
-        // ListView lässt sich von VBox nicht „strecken“, sondern behält ihre Pref-Höhe.
+        materialsList.setFixedCellSize(24); // konstante Zellhöhe
         materialsList.setMinHeight(Region.USE_PREF_SIZE);
         materialsList.setMaxHeight(Region.USE_PREF_SIZE);
     }
 
-    /** Wird vom SceneManager/ControlController aufgerufen. */
+    // ===== Setup: Haupt-PieChart + Center-Icon =====
+    private void setupMainPieChartSizingAndStyle() {
+        if (influencePieChart != null) {
+            influencePieChart.setLegendVisible(false); // Legende aus
+            influencePieChart.setLabelsVisible(false); // Labels aus
+            influencePieChart.setAnimated(false);
+            influencePieChart.prefWidthProperty().bind(pieHolder.widthProperty());
+            influencePieChart.prefHeightProperty().bind(pieHolder.heightProperty());
+        }
+        if (pieCenterImage != null && pieHolder != null) {
+            pieCenterImage.setPreserveRatio(true);
+            pieCenterImage.setSmooth(true);
+            pieCenterImage.setMouseTransparent(true);
+            // GRÖSSER: 55% der kleineren Kante
+            NumberBinding centerSize = Bindings.createDoubleBinding(
+                    () -> 0.55 * Math.min(pieHolder.getWidth(), pieHolder.getHeight()),
+                    pieHolder.widthProperty(), pieHolder.heightProperty()
+            );
+            pieCenterImage.fitWidthProperty().bind(centerSize);
+            pieCenterImage.fitHeightProperty().bind(centerSize);
+        }
+    }
+
+    private void setupPieEmptyOverlay() {
+        if (pieHolder == null) return;
+        pieEmptyOverlay = new Label("Keine Einflussdaten");
+        pieEmptyOverlay.setMouseTransparent(true);
+        pieEmptyOverlay.setStyle("-fx-font-size: 16; -fx-opacity: 0.7; -fx-text-fill: -fx-text-base-color;");
+        pieHolder.getChildren().add(pieEmptyOverlay); // über dem Chart
+        pieEmptyOverlay.setVisible(false);
+    }
+
+    // ===== API vom Control/SceneManager =====
     public void applyVisibility(Set<String> visibleCategoryNames, boolean showEndscore) {
         this.showEndscore = showEndscore;
 
-        // genau eine Baukategorie aus den sichtbaren Namen wählen (falls vorhanden)
         BuildCategory newActive = pickBuildCategoryByNames(visibleCategoryNames);
 
-        // nur dann umschalten, wenn sich die aktive Kategorie wirklich ändert
         if (activeBuild != newActive) {
             activeBuild = newActive;
-            // Caches invalidieren → nächste Refresh-Runde rendert hart neu
+            // Caches invalidieren → harter Refresh
             lastBuildName = null;
             lastPhase = -1;
             lastPhaseTitle = null;
             lastImageUrl = null;
+            lastCenterImgUrl = null;
             lastMaterialsLines = List.of();
+            lastPieSignature = "";
         }
 
-        // Endscore-Box sichtbar?
         if (rightBottomBox != null) {
             rightBottomBox.setVisible(this.showEndscore);
             rightBottomBox.setManaged(this.showEndscore);
         }
 
-        safeRefresh(); // sofort einmal anwenden
+        // Linke Seite: bestimme die ersten 4 sichtbaren Nicht-Baukategorien
+        List<CategoryInterface> extras = firstFourNonBuildCategories(visibleCategoryNames);
+        rebuildExtraChartsGridIfNeeded(extras);
+
+        safeRefresh();
     }
 
+    // ===== Refresh =====
     private void safeRefresh() {
-        try {
-            refreshIfChanged();
-        } catch (Exception ignored) {
-            // robust gegen sporadische NPEs während Szenenwechseln
-        }
+        try { refreshIfChanged(); } catch (Exception ignored) { }
     }
 
-    /** Aktualisiert UI nur, wenn sich etwas geändert hat. */
     private void refreshIfChanged() {
         final BuildCategory bc = activeBuild;
 
-        // 1) aktives Bauspiel & Etappentitel
-        String buildName   = (bc != null) ? nullToDash(bc.getName()) : "—";
-        int    phase       = (bc != null) ? bc.getConstructionPhase() : -1;
-        String phaseTitle  = (bc != null) ? nullToDash(bc.getCurrentPhaseTitle()) : "—";
+        // 1) Überschriften (DisplayName bevorzugt)
+        String displayName = "—";
+        if (bc != null) {
+            try {
+                String dn = bc.getDisplayName(); // BuildCategory hat getDisplayName()
+                displayName = (dn != null && !dn.isBlank()) ? dn : bc.getName();
+            } catch (Throwable ex) {
+                displayName = (bc.getName() != null && !bc.getName().isBlank()) ? bc.getName() : "—";
+            }
+        }
+        int phase = (bc != null) ? bc.getConstructionPhase() : -1;
+        String phaseTitle = (bc != null) ? nullToDash(bc.getCurrentPhaseTitle()) : "—";
 
-        if (!Objects.equals(buildName, lastBuildName)) {
-            if (activeBuildLabel != null) activeBuildLabel.setText(buildName);
-            lastBuildName = buildName;
+        if (!Objects.equals(displayName, lastBuildName)) {
+            if (activeBuildLabel != null) activeBuildLabel.setText(displayName);
+            lastBuildName = displayName;
         }
         if (phase != lastPhase || !Objects.equals(phaseTitle, lastPhaseTitle)) {
             if (phaseTitleLabel != null) phaseTitleLabel.setText(phaseTitle);
@@ -143,28 +208,33 @@ public class ResultController {
             lastPhaseTitle = phaseTitle;
         }
 
-        // 2) Bild (nur bei Änderung setzen → kein Flackern)
+        // 2) Phasenbild (nur bei Änderung → kein Flackern)
         String imgUrl = null;
         if (bc != null) {
             Optional<URL> urlOpt = bc.getCurrentPhaseImageUrl();
-            if (urlOpt.isPresent()) {
-                imgUrl = urlOpt.get().toExternalForm();
-            }
+            if (urlOpt.isPresent()) imgUrl = urlOpt.get().toExternalForm();
         }
         if (!Objects.equals(imgUrl, lastImageUrl)) {
             if (phaseImageView != null) {
-                if (imgUrl == null) {
-                    phaseImageView.setImage(null);
-                } else {
-                    // Original laden, Skalierung übernimmt die ImageView
-                    Image img = new Image(imgUrl, 0, 0, true, true, true);
-                    phaseImageView.setImage(img);
-                }
+                phaseImageView.setImage(imgUrl == null ? null : new Image(imgUrl, 0, 0, true, true, true));
             }
             lastImageUrl = imgUrl;
         }
 
-        // 3) Ressourcenliste (z. B. "4/8 HOLZ")
+        // 3) Center-Icon im Haupt-Pie (imageUrlSpec) – nur bei Änderung
+        String centerUrl = null;
+        if (bc != null) {
+            Optional<URL> urlOpt = bc.getImageUrl();
+            if (urlOpt.isPresent()) centerUrl = urlOpt.get().toExternalForm();
+        }
+        if (!Objects.equals(centerUrl, lastCenterImgUrl)) {
+            if (pieCenterImage != null) {
+                pieCenterImage.setImage(centerUrl == null ? null : new Image(centerUrl, true));
+            }
+            lastCenterImgUrl = centerUrl;
+        }
+
+        // 4) Ressourcenliste
         List<String> lines = (bc != null) ? buildMaterialsLines(bc) : List.of();
         if (!lines.equals(lastMaterialsLines)) {
             if (materialsList != null) {
@@ -173,28 +243,321 @@ public class ResultController {
             }
             lastMaterialsLines = lines;
         }
+
+        // 5) Haupt-Pie: Einflussdaten
+        Map<Integer, Double> infl = (bc != null && bc.getInfluenceMap() != null)
+                ? bc.getInfluenceMap()
+                : Map.of();
+        rebuildMainInfluencePie(bc, infl);
+
+        // 6) Extra-Pies links aktualisieren
+        updateExtraChartsData();
     }
 
-    /** Setzt die ListView-Höhe so, dass alle Zeilen sichtbar sind (keine Scrollbar). */
-    private void resizeMaterialsListToFitContent() {
-        if (materialsList == null) return;
+    // ===== Haupt-PieChart =====
+    private void rebuildMainInfluencePie(BuildCategory bc, Map<Integer, Double> influence) {
+        if (influencePieChart == null) return;
+        if (influence == null) influence = Map.of();
 
-        double cell = materialsList.getFixedCellSize() > 0
-                ? materialsList.getFixedCellSize()
-                : 24;
+        double sum = influence.values().stream()
+                .filter(Objects::nonNull)
+                .mapToDouble(Double::doubleValue)
+                .sum();
 
-        int rows = (materialsList.getItems() != null) ? materialsList.getItems().size() : 0;
-        double newHeight = rows * cell + 2; // +2 px für Borders/Insets
+        String signature = influence.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> e.getKey() + ":" + String.format(Locale.ROOT, "%.4f", e.getValue() == null ? 0.0 : e.getValue()))
+                .collect(Collectors.joining("|"));
 
-        materialsList.setPrefHeight(newHeight);
-        materialsList.setMinHeight(newHeight);
-        materialsList.setMaxHeight(newHeight);
+        if (signature.equals(lastPieSignature)) {
+            if (sum <= 0) showPieEmptyOverlay(true);
+            return;
+        }
+        lastPieSignature = signature;
+
+        if (sum <= 0.0) {
+            influencePieChart.getData().clear();
+            showPieEmptyOverlay(true);
+            return;
+        }
+
+        showPieEmptyOverlay(false);
+
+        Map<Integer, Team> teamById = teamMapById();
+        List<PieChart.Data> data = new ArrayList<>();
+        for (Map.Entry<Integer, Double> e : influence.entrySet()) {
+            double val = e.getValue() != null ? e.getValue() : 0.0;
+            if (val <= 0) continue;
+            Team t = teamById.get(e.getKey());
+            String label = (t != null && t.getName() != null) ? t.getName() : ("Team " + e.getKey());
+            data.add(new PieChart.Data(label, val));
+        }
+        influencePieChart.getData().setAll(data);
+
+        // Teamfarben
+        for (PieChart.Data d : data) {
+            Team t = findTeamByName(teamById, d.getName());
+            String cssColor = teamToCssColor(t);
+            if (cssColor != null) applySliceColor(d, cssColor);
+        }
     }
 
-    private static String nullToDash(String s) {
-        return (s == null || s.isBlank()) ? "—" : s;
+    private void showPieEmptyOverlay(boolean show) {
+        if (pieEmptyOverlay != null) pieEmptyOverlay.setVisible(show);
     }
 
+    // ===== Extra-PieCharts links =====
+    private List<CategoryInterface> firstFourNonBuildCategories(Set<String> visibleNames) {
+        Game g = gameService.getGame();
+        if (g == null || g.getCategories() == null || visibleNames == null) return List.of();
+
+        List<CategoryInterface> out = new ArrayList<>(4);
+        for (CategoryInterface ci : g.getCategories()) {
+            if (ci instanceof BuildCategory) continue;                      // keine Baukategorien
+            String nm = ci.getName();
+            if (nm == null || !visibleNames.contains(nm)) continue;         // nur angehakt
+            out.add(ci);
+            if (out.size() == 4) break;
+        }
+        return out;
+    }
+
+    private void rebuildExtraChartsGridIfNeeded(List<CategoryInterface> extras) {
+        List<String> names = extras.stream().map(CategoryInterface::getName).toList();
+        if (names.equals(lastExtraNames)) return; // nichts geändert
+
+        lastExtraNames = names;
+
+        // Caches für entfernte Kategorien aufräumen
+        extraChartsByName.keySet().removeIf(n -> !names.contains(n));
+        extraIconsByName.keySet().removeIf(n -> !names.contains(n));
+        extraPieSignatureByName.keySet().removeIf(n -> !names.contains(n));
+        extraIconUrlByName.keySet().removeIf(n -> !names.contains(n));
+
+        if (extraChartsGrid == null) return;
+        extraChartsGrid.getChildren().clear();
+        extraChartsByName.clear();
+        extraIconsByName.clear();
+
+        // 2x2 Layout
+        for (int i = 0; i < names.size(); i++) {
+            String catName = names.get(i);
+
+            StackPane cell = new StackPane();
+            cell.getStyleClass().add("extra-pie-cell");
+
+            PieChart chart = new PieChart();
+            chart.setLegendVisible(false);
+            chart.setLabelsVisible(false);
+            chart.setAnimated(false);
+            chart.setClockwise(true);
+            chart.setStartAngle(90);
+
+            ImageView icon = new ImageView();
+            icon.setPreserveRatio(true);
+            icon.setSmooth(true);
+            icon.setMouseTransparent(true);
+
+            // GRÖSSER: 50% der Zelle
+            chart.prefWidthProperty().bind(cell.widthProperty());
+            chart.prefHeightProperty().bind(cell.heightProperty());
+            icon.fitWidthProperty().bind(cell.widthProperty().multiply(0.50));
+            icon.fitHeightProperty().bind(cell.heightProperty().multiply(0.50));
+
+            cell.getChildren().addAll(chart, icon);
+
+            int col = i % 2;
+            int row = i / 2;
+            GridPane.setColumnIndex(cell, col);
+            GridPane.setRowIndex(cell, row);
+            GridPane.setHalignment(cell, HPos.CENTER);
+            GridPane.setValignment(cell, VPos.CENTER);
+
+            extraChartsGrid.getChildren().add(cell);
+            extraChartsByName.put(catName, chart);
+            extraIconsByName.put(catName, icon);
+        }
+    }
+
+    private void updateExtraChartsData() {
+        if (extraChartsByName.isEmpty()) return;
+
+        Map<Integer, Team> teamById = teamMapById();
+
+        Game g = gameService.getGame();
+        if (g == null) return;
+
+        Map<String, CategoryInterface> byName = new HashMap<>();
+        for (CategoryInterface ci : g.getCategories()) {
+            if (ci != null && ci.getName() != null) byName.put(ci.getName(), ci);
+        }
+
+        for (Map.Entry<String, PieChart> e : extraChartsByName.entrySet()) {
+            String catName = e.getKey();
+            PieChart chart = e.getValue();
+            CategoryInterface ci = byName.get(catName);
+
+            // Icon nur bei geänderter URL setzen
+            ImageView icon = extraIconsByName.get(catName);
+            if (icon != null) {
+                String url = (ci != null) ? ci.getImageUrl().map(URL::toExternalForm).orElse(null) : null;
+                String lastUrl = extraIconUrlByName.get(catName);
+                if (!Objects.equals(url, lastUrl)) {
+                    icon.setImage(url == null ? null : new Image(url, true));
+                    extraIconUrlByName.put(catName, url);
+                }
+            }
+
+            if (ci == null) {
+                chart.getData().clear();
+                extraPieSignatureByName.remove(catName);
+                continue;
+            }
+
+            Map<Integer, Double> influence = ci.getInfluenceMap();
+            if (influence == null) influence = Map.of();
+
+            double sum = influence.values().stream()
+                    .filter(Objects::nonNull)
+                    .mapToDouble(Double::doubleValue)
+                    .sum();
+
+            String signature = influence.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .map(inf -> inf.getKey() + ":" + String.format(Locale.ROOT, "%.4f",
+                            inf.getValue() == null ? 0.0 : inf.getValue()))
+                    .collect(Collectors.joining("|"));
+
+            String lastSig = extraPieSignatureByName.get(catName);
+            if (Objects.equals(signature, lastSig)) {
+                // unverändert → nichts tun (kein Flackern)
+                continue;
+            }
+            extraPieSignatureByName.put(catName, signature);
+
+            if (sum <= 0.0) {
+                chart.getData().setAll();
+                continue;
+            }
+
+            List<PieChart.Data> data = new ArrayList<>();
+            for (Map.Entry<Integer, Double> inf : influence.entrySet()) {
+                double val = inf.getValue() != null ? inf.getValue() : 0.0;
+                if (val <= 0) continue;
+                Team t = teamById.get(inf.getKey());
+                String label = (t != null && t.getName() != null) ? t.getName() : ("Team " + inf.getKey());
+                data.add(new PieChart.Data(label, val));
+            }
+            chart.getData().setAll(data);
+
+            // Teamfarben anwenden
+            for (PieChart.Data d : data) {
+                Team t = findTeamByName(teamById, d.getName());
+                String cssColor = teamToCssColor(t);
+                if (cssColor != null) applySliceColor(d, cssColor);
+            }
+        }
+    }
+
+    private void applySliceColor(PieChart.Data d, String cssColor) {
+        d.nodeProperty().addListener((obs, oldNode, node) -> {
+            if (node != null) node.setStyle("-fx-pie-color: " + cssColor + ";");
+        });
+        Node node = d.getNode();
+        if (node != null) node.setStyle("-fx-pie-color: " + cssColor + ";");
+    }
+
+    // ===== Hilfen: Teamdaten / Farben =====
+    private Map<Integer, Team> teamMapById() {
+        Game g = gameService.getGame();
+        Map<Integer, Team> map = new HashMap<>();
+        if (g == null || g.getFamilies() == null) return map;
+        for (Family f : g.getFamilies()) {
+            if (f == null || f.getTeams() == null) continue;
+            for (Team t : f.getTeams()) {
+                if (t != null && t.getId() != null) map.put(t.getId(), t);
+            }
+        }
+        return map;
+    }
+
+    private Team findTeamByName(Map<Integer, Team> byId, String name) {
+        if (name == null) return null;
+        for (Team t : byId.values()) {
+            if (t != null && name.equals(t.getName())) return t;
+        }
+        return null;
+    }
+
+    private String teamToCssColor(Team t) {
+        if (t == null) return null;
+        Object sc = t.getColor(); // SerializableColor
+        String fromSerializable = serializableColorToCss(sc);
+        if (fromSerializable != null) return fromSerializable;
+
+        if (t.getFamily() != null) {
+            Object fc = t.getFamily().getColor();
+            String fromFamily = serializableColorToCss(fc);
+            if (fromFamily != null) return fromFamily;
+        }
+        return null;
+    }
+
+    /** SerializableColor → CSS "rgba(r,g,b,a)" (per Reflection) */
+    private String serializableColorToCss(Object sc) {
+        if (sc == null) return null;
+        try {
+            Method m = sc.getClass().getMethod("toJavaFXColor");
+            Object col = m.invoke(sc);
+            if (col instanceof Color c) {
+                return colorToCss(c);
+            }
+        } catch (Exception ignored) { }
+
+        try {
+            Method mr = sc.getClass().getMethod("getRed");
+            Method mg = sc.getClass().getMethod("getGreen");
+            Method mb = sc.getClass().getMethod("getBlue");
+            Double r = to01(mr.invoke(sc));
+            Double g = to01(mg.invoke(sc));
+            Double b = to01(mb.invoke(sc));
+            double a = 1.0;
+            try {
+                Method ma = sc.getClass().getMethod("getOpacity");
+                a = to01(ma.invoke(sc));
+            } catch (Exception ignored) { }
+            if (r != null && g != null && b != null) {
+                return String.format(Locale.ROOT, "rgba(%d,%d,%d,%.3f)",
+                        (int)Math.round(r * 255),
+                        (int)Math.round(g * 255),
+                        (int)Math.round(b * 255),
+                        a);
+            }
+        } catch (Exception ignored) { }
+        return null;
+    }
+
+    private Double to01(Object val) {
+        if (val == null) return null;
+        if (val instanceof Number n) {
+            double d = n.doubleValue();
+            if (d > 1.0) return d / 255.0;
+            if (d < 0.0) return 0.0;
+            return d;
+        }
+        return null;
+    }
+
+    private String colorToCss(Color c) {
+        if (c == null) return null;
+        return String.format(Locale.ROOT, "rgba(%d,%d,%d,%.3f)",
+                (int)Math.round(c.getRed() * 255),
+                (int)Math.round(c.getGreen() * 255),
+                (int)Math.round(c.getBlue() * 255),
+                c.getOpacity());
+    }
+
+    // ===== Materialien =====
     private List<String> buildMaterialsLines(BuildCategory bc) {
         Map<Material, Integer> need = bc.getNeededMaterials();
         Map<Material, Integer> pay  = bc.getPayedMaterials();
@@ -210,25 +573,47 @@ public class ResultController {
                 .collect(Collectors.toList());
     }
 
+    private void resizeMaterialsListToFitContent() {
+        if (materialsList == null) return;
+        double cell = materialsList.getFixedCellSize() > 0 ? materialsList.getFixedCellSize() : 24;
+        int rows = (materialsList.getItems() != null) ? materialsList.getItems().size() : 0;
+        double newHeight = rows * cell + 2; // +2 px für Border/Insets
+        materialsList.setPrefHeight(newHeight);
+        materialsList.setMinHeight(newHeight);
+        materialsList.setMaxHeight(newHeight);
+    }
+
+    // ===== Auswahlhilfen =====
     private BuildCategory pickBuildCategoryByNames(Set<String> names) {
         if (names == null || names.isEmpty()) return null;
         Game g = gameService.getGame();
         if (g == null || g.getCategories() == null) return null;
 
-        // Kandidaten: nur BuildCategory, deren Name in names enthalten ist
         List<BuildCategory> candidates = g.getCategories().stream()
                 .filter(c -> c instanceof BuildCategory)
                 .map(c -> (BuildCategory) c)
-                .filter(bc -> names.contains(bc.getName()))
+                .filter(bc -> names.contains(bc.getName())
+                        || names.contains(safeGetDisplayName(bc)))
                 .collect(Collectors.toList());
 
         if (candidates.isEmpty()) return null;
-
-        // Falls mehrere angehakt wurden, nimm die erste (Control-Fenster enforced später Single-Choice)
-        return candidates.get(0);
+        return candidates.get(0); // Control erzwingt Single-Choice
     }
 
-    /** Aufräumen (optional vom SceneManager beim Schließen des Fensters aufrufen). */
+    private String safeGetDisplayName(BuildCategory bc) {
+        try {
+            String dn = bc.getDisplayName();
+            return dn == null ? "" : dn;
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    private static String nullToDash(String s) {
+        return (s == null || s.isBlank()) ? "—" : s;
+    }
+
+    // ===== Cleanup =====
     public void shutdown() {
         if (ticker != null) {
             ticker.stop();

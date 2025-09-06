@@ -94,6 +94,9 @@ public class SceneManager {
                 resultStage.setTitle("Resultfenster");
                 resultStage.setScene(new Scene(root));
 
+                resultStage.setWidth(900);   // Anfangsbreite
+                resultStage.setHeight(600);  // Anfangshöhe
+
                 // Vollbild-Exit per ESC erlauben + Hinweistext
                 resultStage.setFullScreenExitHint("ESC zum Vollbild verlassen");
                 resultStage.setFullScreenExitKeyCombination(new KeyCodeCombination(KeyCode.ESCAPE));
@@ -222,5 +225,7 @@ public class SceneManager {
             resultStage.setIconified(true);
         }
     }
+
+
 
 }

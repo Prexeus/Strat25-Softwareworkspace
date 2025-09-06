@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.PieChart?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.*?>
@@ -9,57 +10,92 @@
           fx:controller="com.example.controller.ResultController"
           hgap="0" vgap="0">
 
+    <!-- 40% links, 60% rechts -->
     <columnConstraints>
         <ColumnConstraints percentWidth="40"/>
         <ColumnConstraints percentWidth="60"/>
     </columnConstraints>
 
-    <!-- 50% oben (Bauspiel), 50% unten (Endscore) -->
+    <!-- 60% oben (Bauspiel), 40% unten (Endscore) -->
     <rowConstraints>
-        <RowConstraints percentHeight="50"/>
-        <RowConstraints percentHeight="50"/>
+        <RowConstraints percentHeight="60"/>
+        <RowConstraints percentHeight="40"/>
     </rowConstraints>
 
-    <!-- Linker Bereich (spannt beide Reihen) -->
-    <VBox GridPane.columnIndex="0" GridPane.rowIndex="0" GridPane.rowSpan="2"
-          spacing="10" fillWidth="true">
+    <!-- LINKE SPALTE: Platz für bis zu 4 weitere PieCharts (2x2) -->
+    <GridPane fx:id="extraChartsGrid"
+              GridPane.columnIndex="0" GridPane.rowIndex="0" GridPane.rowSpan="2"
+              hgap="12" vgap="12">
         <padding><Insets topRightBottomLeft="12"/></padding>
-        <Label text="Linker Bereich"/>
-    </VBox>
+        <columnConstraints>
+            <ColumnConstraints percentWidth="50"/>
+            <ColumnConstraints percentWidth="50"/>
+        </columnConstraints>
+        <rowConstraints>
+            <RowConstraints percentHeight="50"/>
+            <RowConstraints percentHeight="50"/>
+        </rowConstraints>
+        <!-- Inhalte werden zur Laufzeit vom Controller eingesetzt -->
+    </GridPane>
 
-    <!-- Rechter Bereich oben -->
+    <!-- RECHTE SPALTE OBEN: Überschriften + Media-Zweispalter + Ressourcenliste -->
     <VBox GridPane.columnIndex="1" GridPane.rowIndex="0"
           spacing="10" fillWidth="true">
         <padding><Insets topRightBottomLeft="12"/></padding>
 
+        <!-- Überschrift: ausführlicher Kategoriename, dann Etappentitel -->
         <Label fx:id="activeBuildLabel" style="-fx-font-size:20; -fx-font-weight:bold;" text="—"/>
         <Label fx:id="phaseTitleLabel"  style="-fx-font-size:16;" text="—"/>
 
-        <!-- Bildbereich: bewusst gedeckelt, damit die Tabelle IMMER passt -->
-        <StackPane fx:id="imageHolder"
-                   VBox.vgrow="NEVER"
-                   minHeight="140"
-                   prefHeight="220"
-                   maxHeight="300">
-            <children>
-                <ImageView fx:id="phaseImageView"
-                           preserveRatio="true"
-                           smooth="true"
-                           cache="true"
-                           pickOnBounds="true"/>
-            </children>
-        </StackPane>
+        <!-- Media-Bereich: links Bild, rechts Pie-Chart (mit Icon) -->
+        <GridPane VBox.vgrow="ALWAYS">
+            <columnConstraints>
+                <ColumnConstraints percentWidth="60"/>
+                <ColumnConstraints percentWidth="40"/>
+            </columnConstraints>
+            <rowConstraints>
+                <RowConstraints vgrow="ALWAYS"/>
+            </rowConstraints>
 
-        <!-- Immer sichtbare Tabelle (keine TitledPane/kein Accordion) -->
-        <Label text="Benötigte Ressourcen" style="-fx-font-weight: bold;"/>
-        <!-- Höhe wird im Controller exakt auf die Anzahl der Items gesetzt -->
-        <ListView fx:id="materialsList"
-                  focusTraversable="false"
-                  mouseTransparent="true"
-                  VBox.vgrow="NEVER"/>
+            <!-- Bild-Holder -->
+            <StackPane fx:id="imageHolder"
+                       GridPane.columnIndex="0" GridPane.rowIndex="0"
+                       maxWidth="Infinity"
+                       minHeight="220"
+                       prefHeight="360">
+                <children>
+                    <ImageView fx:id="phaseImageView"
+                               preserveRatio="true"
+                               smooth="true"
+                               cache="true"
+                               pickOnBounds="true"/>
+                </children>
+            </StackPane>
+
+            <!-- Pie-Chart-Holder mit Center-Image -->
+            <StackPane fx:id="pieHolder"
+                       GridPane.columnIndex="1" GridPane.rowIndex="0"
+                       maxWidth="Infinity"
+                       minHeight="220"
+                       prefHeight="360">
+                <children>
+                    <PieChart fx:id="influencePieChart"
+                              labelsVisible="false"
+                              legendVisible="false"/>
+                    <!-- Icon in der Mitte -->
+                    <ImageView fx:id="pieCenterImage"
+                               mouseTransparent="true"
+                               preserveRatio="true"/>
+                </children>
+            </StackPane>
+        </GridPane>
+
+        <!-- Ressourcenliste immer sichtbar -->
+        <Label text="Benötigte Ressourcen" style="-fx-font-weight:bold;"/>
+        <ListView fx:id="materialsList"/>
     </VBox>
 
-    <!-- Rechter Bereich unten: Endscore -->
+    <!-- RECHTE SPALTE UNTEN: Endscore -->
     <VBox fx:id="rightBottomBox"
           GridPane.columnIndex="1" GridPane.rowIndex="1"
           spacing="10" fillWidth="true">

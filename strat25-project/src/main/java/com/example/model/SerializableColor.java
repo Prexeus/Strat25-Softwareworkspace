@@ -3,6 +3,7 @@ package com.example.model;
 import javafx.scene.paint.Color;
 
 import java.io.Serializable;
+import java.lang.reflect.Method;
 import java.util.Objects;
 
 /**
@@ -140,4 +141,9 @@ public final class SerializableColor implements Serializable {
                 ", hex='" + toHexRgba() + '\'' +
                 '}';
     }
+
+    public Color toJavaFXColor() {
+        return getFxColor();
+    }
+
 }

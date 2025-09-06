@@ -17,35 +17,38 @@ public class GameFactoryService {
      */
     public static Game newGame(String gameName) {
         // === Families definieren ===
-        Family familyRed = new Family("Orléans", SerializableColor.of255(200, 30, 30));
-        Family familyBlue = new Family("La Rochefoucauld", SerializableColor.of255(30, 80, 200));
-        Family familyGreen = new Family("Noailles", SerializableColor.of255(20, 150, 60));
+        Family familyRed = new Family("Orléans", SerializableColor.fromHex("#20699e"));
+        Family familyBlue = new Family("La Rochefoucauld", SerializableColor.fromHex("#797978"));
+        Family familyGreen = new Family("Noailles", SerializableColor.fromHex("#a0482c"));
 
         List<Family> families = List.of(familyRed, familyBlue, familyGreen);
 
         // === Teams definieren ===
         List<Team> teams = new ArrayList<>();
 
+
         // Rot-Familie → rötliche Farbtöne
-        teams.add(new Team("Team 1", 1, SerializableColor.of255(255, 80, 80), familyRed));
-        teams.add(new Team("Team 2", 2, SerializableColor.of255(200, 50, 50), familyRed));
-        teams.add(new Team("Team 3", 3, SerializableColor.of255(255, 140, 100), familyRed));
+        teams.add(new Team("Team 1", 1, SerializableColor.fromHex("#28509c"), familyRed));
+        teams.add(new Team("Team 2", 2, SerializableColor.fromHex("#20699e"), familyRed));
+        teams.add(new Team("Team 3", 3, SerializableColor.fromHex("#2b839e"), familyRed));
 
         // Blau-Familie → bläuliche Farbtöne
-        teams.add(new Team("Team 4", 4, SerializableColor.of255(80, 140, 255), familyBlue));
-        teams.add(new Team("Team 5", 5, SerializableColor.of255(50, 100, 200), familyBlue));
-        teams.add(new Team("Team 6", 6, SerializableColor.of255(100, 200, 255), familyBlue));
+        teams.add(new Team("Team 4", 4, SerializableColor.fromHex("#5f5f5f"), familyBlue));
+        teams.add(new Team("Team 5", 5, SerializableColor.fromHex("#797978"), familyBlue));
+        teams.add(new Team("Team 6", 6, SerializableColor.fromHex("#9f9fa0"), familyBlue));
 
         // Grün-Familie → grünliche Farbtöne
-        teams.add(new Team("Team 7", 7, SerializableColor.of255(120, 255, 120), familyGreen));
-        teams.add(new Team("Team 8", 8, SerializableColor.of255(60, 180, 60), familyGreen));
-        teams.add(new Team("Team 9", 9, SerializableColor.of255(40, 120, 40), familyGreen));
+        teams.add(new Team("Team 7", 7, SerializableColor.fromHex("#952929"), familyGreen));
+        teams.add(new Team("Team 8", 8, SerializableColor.fromHex("#a0482c"), familyGreen));
+        teams.add(new Team("Team 9", 9, SerializableColor.fromHex("#965d28"), familyGreen));
+
+
 
         List<CategoryInterface> categorys = new ArrayList<>();
-        categorys.add(new Category("Politischer Einfluss", teams));
-        categorys.add(new Category("Militärische Stärke", teams));
-        categorys.add(new Category("Unruhe", teams));
-        categorys.add(new Category("Rückhalt im Volk", teams));
+        categorys.add(new Category("Politischer Einfluss", teams, "/com/example/images/category/politik.png"));
+        categorys.add(new Category("Militärische Stärke", teams, "/com/example/images/category/militaer.png"));
+        categorys.add(new Category("Unruhe", teams, "/com/example/images/category/unruhe.png"));
+        categorys.add(new Category("Rückhalt im Volk", teams, "/com/example/images/category/rueckhalt.png"));
 
         Map<Material, Double> materialWorths = new HashMap<>();
         materialWorths.put(Material.BAUMSTAEMME, 1.205);
@@ -57,14 +60,15 @@ public class GameFactoryService {
         materialWorths.put(Material.BROT, 0.7807);
         materialWorths.put(Material.METALL, 1.1154);
         materialWorths.put(Material.WAFFEN, 1.2269);
-        materialWorths.put(Material.MILITAERISCHE_STAERKE, 0.3346);
-        materialWorths.put(Material.HYMNEN, 0.0536);
+        materialWorths.put(Material.ARBEITSKRAFT, 0.3346);
+        materialWorths.put(Material.MILITAERISCHE_STAERKE, 0.0536);
+        materialWorths.put(Material.HYMNEN, 0.00112);
 
         CategoryInterface revolution = new BuildCategory(
-                "Revolution", teams, "/com/example/csv/revolution.csv", materialWorths, "/com/example/images/revolution", "/com/example/images/category/sample.PNG");
+                "Revolution", "Aufbau der Revolution", teams, "/com/example/csv/revolution.csv", materialWorths, "/com/example/images/revolution", "/com/example/images/category/revolution.PNG");
 
         CategoryInterface versailles = new BuildCategory(
-                "Versailles", teams, "/com/example/csv/versailles.csv", materialWorths, "/com/example/images/versailles", "/com/example/images/category/sample.PNG");
+                "Versailles", "Bau von Versailles", teams, "/com/example/csv/versailles.csv", materialWorths, "/com/example/images/versailles", "/com/example/images/category/versailles.PNG");
 
         categorys.add(revolution);
         categorys.add(versailles);

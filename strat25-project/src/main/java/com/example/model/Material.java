@@ -10,6 +10,7 @@ public enum Material {
     BROT,
     METALL,
     WAFFEN,
+    ARBEITSKRAFT,
     MILITAERISCHE_STAERKE,
     HYMNEN
 }
