@@ -5,11 +5,26 @@
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.example.controller.LauncherController"
-      alignment="CENTER" spacing="14" prefWidth="520" prefHeight="300">
+      alignment="CENTER" spacing="14" prefWidth="520" prefHeight="360">
     <padding><Insets topRightBottomLeft="20"/></padding>
+
+    <!-- WICHTIG: ToggleGroup muss existieren, damit modeGroup injiziert wird -->
+    <fx:define>
+        <ToggleGroup fx:id="modeGroup"/>
+    </fx:define>
 
     <children>
         <Label text="Start Game" style="-fx-font-size:18; -fx-font-weight:bold;"/>
+
+        <!-- Host/Slave Auswahl -->
+        <HBox spacing="10" alignment="CENTER">
+            <children>
+                <RadioButton fx:id="hostModeBtn" text="Host" toggleGroup="$modeGroup" selected="true"/>
+                <RadioButton fx:id="slaveModeBtn" text="Slave" toggleGroup="$modeGroup"/>
+                <Label text="Host-IP:"/>
+                <TextField fx:id="hostAddressField" promptText="z. B. 192.168.0.10" prefWidth="160" disable="true"/>
+            </children>
+        </HBox>
 
         <!-- Neue Spielstand-Erstellung -->
         <HBox spacing="8" alignment="CENTER">

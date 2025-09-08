@@ -74,6 +74,7 @@ public class GameRuntimeService implements AutoCloseable {
                         // Pause time & events while saving to keep a clean snapshot.
                         pause();
                         gameService.saveGame(); // runs on logic thread; blocks logic briefly
+                        gameService.backupGame();
                     } catch (Exception e) {
                         e.printStackTrace();
                     } finally {

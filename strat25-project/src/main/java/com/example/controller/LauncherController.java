@@ -1,6 +1,7 @@
 package com.example.controller;
 
 import com.example.service.GameService;
+import com.example.service.NodeMode;
 import com.example.view.SceneManager;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
@@ -18,6 +19,11 @@ public class LauncherController {
         this.sceneManager = sceneManager;
     }
 
+    @FXML private ToggleGroup modeGroup;        // via FXML <ToggleGroup fx:id="modeGroup"/>
+    @FXML private RadioButton hostModeBtn;
+    @FXML private RadioButton slaveModeBtn;
+    @FXML private TextField hostAddressField;   // Ziel-IP des Hosts (bei Slave)
+
     @FXML private TextField saveNameField;
     @FXML private Button newBtn;
     @FXML private Button loadBtn;
@@ -29,6 +35,28 @@ public class LauncherController {
 
     @FXML
     private void initialize() {
+        // --- Sicherstellen, dass eine ToggleGroup existiert & Buttons drin sind ---
+        if (modeGroup == null) {
+            modeGroup = new ToggleGroup();
+        }
+        if (hostModeBtn != null && hostModeBtn.getToggleGroup() == null) {
+            hostModeBtn.setToggleGroup(modeGroup);
+        }
+        if (slaveModeBtn != null && slaveModeBtn.getToggleGroup() == null) {
+            slaveModeBtn.setToggleGroup(modeGroup);
+        }
+        // Falls noch nichts selektiert: Host als Default
+        if (modeGroup.getSelectedToggle() == null && hostModeBtn != null) {
+            hostModeBtn.setSelected(true);
+        }
+
+        // Listener: UI -> Mode anwenden
+        modeGroup.selectedToggleProperty().addListener((obs, o, n) ->
+                applyMode(slaveModeBtn != null && slaveModeBtn.isSelected()));
+
+        // UI initial an aktuellen Zustand anpassen
+        applyMode(slaveModeBtn != null && slaveModeBtn.isSelected());
+
         // Buttons
         newBtn.setOnAction(e -> onNewGame());
         loadBtn.setOnAction(e -> onLoadSelectedSave());
@@ -37,20 +65,54 @@ public class LauncherController {
         refreshBackupsBtn.setOnAction(e -> refreshBackups());
 
         // Wenn Save gewählt wird, Namen ins Textfeld übernehmen & Backups aktualisieren
-        savesBox.valueProperty().addListener((obs, oldV, newV) -> {
-            if (newV != null) {
-                saveNameField.setText(newV);
-                refreshBackups();
-            } else {
-                backupsBox.setItems(FXCollections.observableArrayList());
-            }
-        });
+        if (savesBox != null) {
+            savesBox.valueProperty().addListener((obs, oldV, newV) -> {
+                if (newV != null) {
+                    if (saveNameField != null) saveNameField.setText(newV);
+                    refreshBackups();
+                } else {
+                    if (backupsBox != null)
+                        backupsBox.setItems(FXCollections.observableArrayList());
+                }
+            });
+        }
 
         // initial laden
         refreshSaves();
     }
 
+    /** Zentral: Mode setzen + UI deaktivieren/aktivieren */
+    private void applyMode(boolean slave) {
+        if (slave) {
+            String addr = (hostAddressField != null) ? hostAddressField.getText() : null;
+            gameService.setHostAddress(addr);
+            gameService.setNodeMode(NodeMode.SLAVE);
+        } else {
+            gameService.setNodeMode(NodeMode.HOST);
+        }
+
+        // UI anpassen
+        if (saveNameField != null) saveNameField.setDisable(slave);
+        if (newBtn != null) newBtn.setDisable(slave);
+        if (savesBox != null) savesBox.setDisable(slave);
+        if (refreshSavesBtn != null) refreshSavesBtn.setDisable(slave);
+        if (loadBtn != null) loadBtn.setDisable(slave);
+        if (backupsBox != null) backupsBox.setDisable(slave);
+        if (refreshBackupsBtn != null) refreshBackupsBtn.setDisable(slave);
+        if (loadBackupBtn != null) loadBackupBtn.setDisable(slave);
+        if (hostAddressField != null) hostAddressField.setDisable(!slave);
+    }
+
+    private boolean isSlave() {
+        return gameService.getNodeMode() == NodeMode.SLAVE;
+    }
+
     private void onNewGame() {
+        if (isSlave()) {
+            // Kein Save nötig – gleich ins Spiel (gleiches Fenster)
+            sceneManager.showGame();
+            return;
+        }
         String name = readName();
         if (name.isEmpty()) { warn("Please enter a name for the new game."); return; }
         try {
@@ -62,6 +124,10 @@ public class LauncherController {
     }
 
     private void onLoadSelectedSave() {
+        if (isSlave()) {
+            sceneManager.showGame();
+            return;
+        }
         String selected = savesBox.getValue();
         String name = (selected != null && !selected.isBlank()) ? selected : readName();
         if (name.isEmpty()) { warn("Pick a save from the list or type its name."); return; }
@@ -75,47 +141,56 @@ public class LauncherController {
     }
 
     private void onLoadSelectedBackup() {
+        if (isSlave()) {
+            sceneManager.showGame();
+            return;
+        }
         String save = savesBox.getValue();
         String backup = backupsBox.getValue();
         if (save == null || save.isBlank()) { warn("Select a base save first."); return; }
         if (backup == null || backup.isBlank()) { warn("Select a backup to load."); return; }
-
-        // Hier rufst du deine Backup-Load-Methode auf (implementiere sie im GameService/Repository)
         try {
-            // Beispiel-API: gameService.loadBackup(save, backup);
-            // Placeholder:
             warn("Implement GameService.loadBackup(saveName, backupFile).");
-            // Wenn vorhanden:
-            // gameService.loadBackup(save, backup);
-            // gameService.startGame();
-            // sceneManager.showGame();
         } catch (Exception ex) {
             error("Failed to load backup:\n" + ex.getMessage());
         }
     }
 
     private void refreshSaves() {
+        if (isSlave()) {
+            if (savesBox != null) savesBox.setItems(FXCollections.observableArrayList());
+            if (backupsBox != null) backupsBox.setItems(FXCollections.observableArrayList());
+            return;
+        }
         List<String> names = List.of(); // fallback
         try { names = gameService.listSaves(); } catch (Exception ignored) {}
-        savesBox.setItems(FXCollections.observableArrayList(names));
-        savesBox.getSelectionModel().clearSelection();
-        backupsBox.setItems(FXCollections.observableArrayList()); // leeren, bis ein Save gewählt wurde
+        if (savesBox != null) {
+            savesBox.setItems(FXCollections.observableArrayList(names));
+            savesBox.getSelectionModel().clearSelection();
+        }
+        if (backupsBox != null) backupsBox.setItems(FXCollections.observableArrayList());
     }
 
     private void refreshBackups() {
-        String save = savesBox.getValue();
+        if (isSlave()) {
+            if (backupsBox != null) backupsBox.setItems(FXCollections.observableArrayList());
+            return;
+        }
+        String save = (savesBox != null) ? savesBox.getValue() : null;
         if (save == null || save.isBlank()) {
-            backupsBox.setItems(FXCollections.observableArrayList());
+            if (backupsBox != null) backupsBox.setItems(FXCollections.observableArrayList());
             return;
         }
         List<String> backups = List.of(); // fallback
         try { backups = gameService.listBackups(save); } catch (Exception ignored) {}
-        backupsBox.setItems(FXCollections.observableArrayList(backups));
-        backupsBox.getSelectionModel().clearSelection();
+        if (backupsBox != null) {
+            backupsBox.setItems(FXCollections.observableArrayList(backups));
+            backupsBox.getSelectionModel().clearSelection();
+        }
     }
 
     private String readName() {
-        String s = saveNameField.getText();
+        String s = (saveNameField != null) ? saveNameField.getText() : "";
         return s == null ? "" : s.trim();
     }
 
@@ -123,6 +198,10 @@ public class LauncherController {
     private static void warn(String msg) { show(Alert.AlertType.WARNING, "Warning", msg); }
     private static void error(String msg){ show(Alert.AlertType.ERROR, "Error", msg); }
     private static void show(Alert.AlertType type, String title, String msg) {
-        Alert a = new Alert(type); a.setTitle(title); a.setHeaderText(null); a.setContentText(msg); a.showAndWait();
+        Alert a = new Alert(type);
+        a.setTitle(title);
+        a.setHeaderText(null);
+        a.setContentText(msg);
+        a.showAndWait();
     }
 }

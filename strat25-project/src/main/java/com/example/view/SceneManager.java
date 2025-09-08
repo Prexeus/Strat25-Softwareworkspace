@@ -10,7 +10,6 @@ import javafx.stage.Stage;
 import javafx.util.Callback;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
 
 import java.io.IOException;
@@ -218,14 +217,10 @@ public class SceneManager {
         if (resultStage == null)
             showResultWindow();
         if (resultStage != null) {
-            // aus dem Vollbild raus, bevor wir minimieren (sonst wirkt es je nach OS
-            // seltsam)
+            // aus dem Vollbild raus, bevor wir minimieren
             if (resultStage.isFullScreen())
                 resultStage.setFullScreen(false);
             resultStage.setIconified(true);
         }
     }
-
-
-
 }

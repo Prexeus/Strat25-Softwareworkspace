@@ -386,78 +386,56 @@ public class GameController {
     // -------- Actions (Mutationen via Logic-Thread) --------
 
     private void applyTeamPrestigeDelta(Team team, TextField deltaField) {
-        String txt = deltaField.getText();
-        if (txt == null || txt.isBlank()) {
-            warn("Enter a number like 12 or -30.");
-            return;
-        }
-        try {
-            double v = Double.parseDouble(txt.replace(',', '.'));
-            gameService.runOnLogic(() -> team.addPrestige(v));
-            deltaField.clear();
-        } catch (NumberFormatException nfe) {
-            warn("Invalid number. Examples: 12, -30, 3.5");
-        }
+    String txt = deltaField.getText();
+    if (txt == null || txt.isBlank()) { warn("Enter a number like 12 or -30."); return; }
+    try {
+        double v = Double.parseDouble(txt.replace(',', '.'));
+        gameService.requestTeamPrestigeDelta(team.getId(), v); // <— NEU
+        deltaField.clear();
+    } catch (NumberFormatException nfe) {
+        warn("Invalid number. Examples: 12, -30, 3.5");
     }
+}
 
     private void applyInfluenceDelta(Team team, InfluenceRow row) {
-        String txt = row.deltaField.getText();
-        if (txt == null || txt.isBlank()) {
-            warn("Enter a number like 5 or -2.");
-            return;
-        }
-        try {
-            double v = Double.parseDouble(txt.replace(',', '.'));
-            gameService.runOnLogic(() -> {
-                Map<Integer, Double> map = row.category.getInfluenceMap();
-                if (!map.containsKey(team.getId()))
-                    map.put(team.getId(), 0.0);
-                row.category.addInfluence(team, v);
-            });
-            row.deltaField.clear();
-        } catch (NumberFormatException nfe) {
-            warn("Invalid number. Examples: 5, -2, 1.25");
-        }
+    String txt = row.deltaField.getText();
+    if (txt == null || txt.isBlank()) { warn("Enter a number like 5 or -2."); return; }
+    try {
+        double v = Double.parseDouble(txt.replace(',', '.'));
+        gameService.requestInfluenceDelta(
+                team.getId(),
+                row.category.getName(),
+                v
+        ); // <— NEU
+        row.deltaField.clear();
+    } catch (NumberFormatException nfe) {
+        warn("Invalid number. Examples: 5, -2, 1.25");
     }
+}
 
     private void applyMaterialDelta(Team team, MaterialRow row) {
-        BuildCategory bc = getSelectedBuild();
-        if (bc == null) {
-            warn("Bitte zuerst ein Bauspiel rechts auswählen.");
-            return;
-        }
-        String txt = row.amountField.getText();
-        if (txt == null || txt.isBlank()) {
-            warn("Bitte eine Menge eingeben (z. B. 2).");
-            return;
-        }
-        int v;
-        try {
-            v = Integer.parseInt(txt.trim());
-            if (v <= 0) {
-                warn("Nur positive Mengen einzahlen.");
-                return;
-            }
-        } catch (NumberFormatException nfe) {
-            warn("Ungültige Zahl. Beispiel: 2");
-            return;
-        }
+    BuildCategory bc = getSelectedBuild();
+    if (bc == null) { warn("Bitte zuerst ein Bauspiel rechts auswählen."); return; }
+    String txt = row.amountField.getText();
+    if (txt == null || txt.isBlank()) { warn("Bitte eine Menge eingeben (z. B. 2)."); return; }
 
-        gameService.runOnLogic(() -> {
-            int free = calcFree(bc, row.material);
-            if (free <= 0) {
-                Platform.runLater(() -> warn("Für " + row.material.name() + " wird aktuell nichts mehr benötigt."));
-                return;
-            }
-            if (v > free) {
-                int max = free;
-                Platform.runLater(() -> warn("Maximal " + max + " einzahlbar (noch frei)."));
-                return;
-            }
-            bc.addMaterial(team, row.material, v);
-            Platform.runLater(row.amountField::clear);
-        });
+    int v;
+    try {
+        v = Integer.parseInt(txt.trim());
+        if (v <= 0) { warn("Nur positive Mengen einzahlen."); return; }
+    } catch (NumberFormatException nfe) {
+        warn("Ungültige Zahl. Beispiel: 2"); return;
     }
+
+    // Client/Server-Routing übernimmt GameService
+    gameService.requestMaterialAdd(
+            team.getId(),
+            bc.getName(),
+            row.material.name(),
+            v
+    ); // <— NEU
+    row.amountField.clear();
+}
 
     private int calcFree(BuildCategory bc, Material material) {
         Map<Material, Integer> need = bc.getNeededMaterials();
@@ -468,44 +446,32 @@ public class GameController {
     }
 
     private void applySpeedFromField() {
-        Game g = gameService.getGame();
-        if (g == null)
-            return;
-        String txt = speedField.getText();
-        if (txt == null || txt.isBlank()) {
-            warn("Please enter a positive number for the game speed (e.g., 1.0, 2.0, 0.5).");
-            return;
-        }
-        try {
-            double v = Double.parseDouble(txt.replace(',', '.'));
-            if (v <= 0)
-                throw new IllegalArgumentException("Speed must be > 0");
-            gameService.runOnLogic(() -> g.getGameTime().setGameSpeed(v));
-            speedField.clear();
-        } catch (Exception ex) {
-            warn("Invalid speed. Use a positive number (e.g., 1.0, 2.0, 0.5).");
-        }
+    Game g = gameService.getGame(); if (g == null) return;
+    String txt = speedField.getText();
+    if (txt == null || txt.isBlank()) { warn("Please enter a positive number ..."); return; }
+    try {
+        double v = Double.parseDouble(txt.replace(',', '.'));
+        if (v <= 0) throw new IllegalArgumentException();
+        gameService.requestSetGameSpeed(v); // <— NEU
+        speedField.clear();
+    } catch (Exception ex) {
+        warn("Invalid speed. Use a positive number (e.g., 1.0, 2.0, 0.5).");
     }
+}
 
     private void applyMultiplierFromField() {
-        Game g = gameService.getGame();
-        if (g == null)
-            return;
-        String txt = multiplierField.getText();
-        if (txt == null || txt.isBlank()) {
-            warn("Please enter a positive number for the prestige multiplier (e.g., 1.0, 2.0, 0.5).");
-            return;
-        }
-        try {
-            double v = Double.parseDouble(txt.replace(',', '.'));
-            if (v <= 0)
-                throw new IllegalArgumentException("Multiplier must be > 0");
-            gameService.runOnLogic(() -> g.setPrestigeMultiplier(v));
-            multiplierField.clear();
-        } catch (Exception ex) {
-            warn("Invalid multiplier. Use a positive number (e.g., 1.0, 2.0, 0.5).");
-        }
+    Game g = gameService.getGame(); if (g == null) return;
+    String txt = multiplierField.getText();
+    if (txt == null || txt.isBlank()) { warn("Please enter a positive number ..."); return; }
+    try {
+        double v = Double.parseDouble(txt.replace(',', '.'));
+        if (v <= 0) throw new IllegalArgumentException();
+        gameService.requestSetPrestigeMultiplier(v); // <— NEU
+        multiplierField.clear();
+    } catch (Exception ex) {
+        warn("Invalid multiplier. Use a positive number (e.g., 1.0, 2.0, 0.5).");
     }
+}
 
     // -------- Updates --------
 
