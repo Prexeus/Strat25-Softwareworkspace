@@ -3,17 +3,15 @@ package com.example.service;
 import com.example.model.*;
 import com.example.net.*;
 
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectOutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
 
 public class GameService {
 
-    // ---- Authority (Host) vs. Mirror (Slave) ----
-    private Game game;                 // Host: authoritative
-    private volatile Game mirrorGame;  // Slave: last received snapshot
+    private Game game;
 
     private final com.example.repository.RepositoryService<Game> gameRepository;
     private final com.example.time.GameRuntimeService gameRuntimeService;
@@ -21,16 +19,10 @@ public class GameService {
     // --- NodeMode / Networking ---
     private volatile NodeMode nodeMode = NodeMode.HOST;
     private String hostAddress = "127.0.0.1";
+    private final int INPUT_PORT = 53536;
 
-    private final int INPUT_PORT = 53536;   // Eingaben Slave->Host
-    private final int SYNC_PORT  = 53537;   // State Host->Slave
-
-    private transient NetInputServer netServer;       // nur auf HOST aktiv
-    private transient NetInputClient netClient;       // nur auf SLAVE aktiv
-
-    private transient GameSyncServer syncServer;      // nur auf HOST aktiv
-    private transient GameSyncClient syncClient;      // nur auf SLAVE aktiv
-    private transient ScheduledExecutorService syncScheduler;
+    private transient NetInputServer netServer;  // nur auf HOST aktiv
+    private transient NetInputClient netClient;  // nur auf SLAVE aktiv
 
     // optional: Discovery
     private transient DiscoveryResponder discoveryResponder;
@@ -76,21 +68,17 @@ public class GameService {
 
     // ----------------- Accessors -----------------
 
-    /** Host liefert authoritative Game; Slave liefert gespiegelt (Snapshot). */
-    public Game getGame() {
-        return (nodeMode == NodeMode.HOST) ? game : mirrorGame;
-    }
+    public Game getGame() { return game; }
 
     public void printCurrentGame() {
-        Game g = getGame();
-        if (g == null) { System.out.println("No game loaded."); return; }
-        System.out.println("Current Game: " + g.getName());
-        System.out.println("Families: " + g.getFamilies().get(0).getName() + ", "
-                + g.getFamilies().get(1).getName() + ", "
-                + g.getFamilies().get(2).getName());
-        System.out.println("Categories: " + g.getCategories().get(0).getName() + ", "
-                + g.getCategories().get(1).getName() + ", "
-                + g.getCategories().get(2).getName());
+        if (getGame() == null) { System.out.println("No game loaded."); return; }
+        System.out.println("Current Game: " + getGame().getName());
+        System.out.println("Families: " + getGame().getFamilies().get(0).getName() + ", "
+                + getGame().getFamilies().get(1).getName() + ", "
+                + getGame().getFamilies().get(2).getName());
+        System.out.println("Categories: " + getGame().getCategories().get(0).getName() + ", "
+                + getGame().getCategories().get(1).getName() + ", "
+                + getGame().getCategories().get(2).getName());
     }
 
     // ----------------- NodeMode / Networking -----------------
@@ -100,16 +88,12 @@ public class GameService {
     public void setNodeMode(NodeMode mode) {
         this.nodeMode = mode;
         if (mode == NodeMode.HOST) {
-            ensureInputServerRunning();
-            ensureSyncServerRunning();
+            ensureServerRunning();
             stopDiscovery(); // optional
             this.netClient = null;
-            stopSyncClient(); // falls vorher Slave
         } else {
-            stopInputServer();
-            stopSyncServer();
+            stopServer();
             ensureClientReady();
-            ensureSyncClientRunning();
             ensureDiscoveryRunning(); // optional
         }
     }
@@ -118,18 +102,17 @@ public class GameService {
         this.hostAddress = (host == null || host.isBlank()) ? "127.0.0.1" : host.trim();
         if (nodeMode == NodeMode.SLAVE) {
             ensureClientReady();
-            ensureSyncClientRunning();
         }
     }
 
-    private void ensureInputServerRunning() {
+    private void ensureServerRunning() {
         if (netServer == null) {
             netServer = new NetInputServer(INPUT_PORT, this);
             netServer.start();
         }
     }
 
-    private void stopInputServer() {
+    private void stopServer() {
         if (netServer != null) {
             try { netServer.close(); } catch (Exception ignored) {}
             netServer = null;
@@ -138,75 +121,6 @@ public class GameService {
 
     private void ensureClientReady() {
         netClient = new NetInputClient(hostAddress, INPUT_PORT);
-    }
-
-    // --- Host->Slave Sync (Game Snapshot Streaming) ----
-
-    private void ensureSyncServerRunning() {
-        if (syncServer == null) {
-            syncServer = new GameSyncServer(SYNC_PORT);
-            syncServer.start();
-        }
-        if (syncScheduler == null) {
-            syncScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-                Thread t = new Thread(r, "GameSyncScheduler");
-                t.setDaemon(true);
-                return t;
-            });
-            // alle 6 Sekunde einen konsistenten Snapshot pushen
-            syncScheduler.scheduleAtFixedRate(this::pushSnapshotOnce, 0, 6, TimeUnit.SECONDS);
-        }
-    }
-
-    private void stopSyncServer() {
-        if (syncScheduler != null) {
-            syncScheduler.shutdownNow();
-            syncScheduler = null;
-        }
-        if (syncServer != null) {
-            try { syncServer.close(); } catch (Exception ignored) {}
-            syncServer = null;
-        }
-    }
-
-    private void ensureSyncClientRunning() {
-        if (syncClient != null) return;
-        syncClient = new GameSyncClient(hostAddress, SYNC_PORT, this::onSnapshotReceived);
-        syncClient.start();
-    }
-
-    private void stopSyncClient() {
-        if (syncClient != null) {
-            try { syncClient.close(); } catch (Exception ignored) {}
-            syncClient = null;
-        }
-    }
-
-    /** Auf Host: snapshot erstellen (auf Logic-Thread) und broadcasten. */
-    private void pushSnapshotOnce() {
-        try {
-            byte[] payload = callOnLogic(() -> {
-                Game g = this.game;
-                if (g == null) return null;
-                try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                     ObjectOutputStream oos = new ObjectOutputStream(bos)) {
-                    oos.writeObject(g); // konsistente Kopie dank single logic thread
-                    oos.flush();
-                    return bos.toByteArray();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    return null;
-                }
-            });
-            if (payload != null && syncServer != null) {
-                syncServer.broadcast(payload);
-            }
-        } catch (Exception ignored) {}
-    }
-
-    /** Auf Slave: Snapshot empfangen -> als Mirror-Game setzen. */
-    private void onSnapshotReceived(Game snapshot) {
-        this.mirrorGame = snapshot;
     }
 
     // --- optional: DiscoveryResponder ---
@@ -226,13 +140,22 @@ public class GameService {
     /** Für Application.stop(): beendet Netzwerkteile robust. */
     public void shutdown() {
         stopDiscovery();
-        stopInputServer();
-        stopSyncServer();
-        stopSyncClient();
-        // Client (Input) ist kurzlebig, hier nichts weiter nötig
+        stopServer();
+        // Client ist kurzlebig (pro Send neu), daher nichts nötig.
     }
 
-    // ----------------- PUBLIC API für Controller (Host/Slave-transparente Eingaben) -----------------
+    // ----------------- NEU: Verbindungstest (nur TCP-Connect) -----------------
+    /** Prüft, ob der Host-Port erreichbar ist (TCP Connect mit Timeout). */
+    public boolean testConnectionToHost() {
+        try (Socket s = new Socket()) {
+            s.connect(new InetSocketAddress(hostAddress, INPUT_PORT), 1200);
+            return true; // Connect erfolgreich
+        } catch (Exception e) {
+            return false; // Connect fehlgeschlagen
+        }
+    }
+
+    // ----------------- Public API für Controller (Host/Slave-transparente Eingaben) -----------------
 
     public void requestTeamPrestigeDelta(int teamId, double delta) {
         if (nodeMode == NodeMode.SLAVE) {
@@ -373,9 +296,8 @@ public class GameService {
     // ----------------- Finder -----------------
 
     private Team findTeamById(int id) {
-        Game g = this.game; // authoritative
-        if (g == null || g.getFamilies() == null) return null;
-        for (Family f : g.getFamilies()) {
+        if (game == null || game.getFamilies() == null) return null;
+        for (Family f : game.getFamilies()) {
             if (f.getTeams() == null) continue;
             for (Team t : f.getTeams()) {
                 if (t != null && t.getId() == id) return t;
@@ -385,18 +307,16 @@ public class GameService {
     }
 
     private CategoryInterface findCategoryByName(String name) {
-        Game g = this.game;
-        if (g == null || g.getCategories() == null || name == null) return null;
-        for (CategoryInterface ci : g.getCategories()) {
+        if (game == null || game.getCategories() == null || name == null) return null;
+        for (CategoryInterface ci : game.getCategories()) {
             if (name.equals(ci.getName())) return ci;
         }
         return null;
     }
 
     private BuildCategory findBuildCategoryByName(String name) {
-        Game g = this.game;
-        if (g == null || g.getCategories() == null || name == null) return null;
-        for (CategoryInterface ci : g.getCategories()) {
+        if (game == null || game.getCategories() == null || name == null) return null;
+        for (CategoryInterface ci : game.getCategories()) {
             if (ci instanceof BuildCategory bc && name.equals(bc.getName())) return bc;
         }
         return null;

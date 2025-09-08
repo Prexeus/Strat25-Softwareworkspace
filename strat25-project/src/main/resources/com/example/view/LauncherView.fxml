@@ -5,10 +5,9 @@
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.example.controller.LauncherController"
-      alignment="CENTER" spacing="14" prefWidth="520" prefHeight="360">
+      alignment="CENTER" spacing="14" prefWidth="560" prefHeight="400">
     <padding><Insets topRightBottomLeft="20"/></padding>
 
-    <!-- WICHTIG: ToggleGroup muss existieren, damit modeGroup injiziert wird -->
     <fx:define>
         <ToggleGroup fx:id="modeGroup"/>
     </fx:define>
@@ -16,26 +15,31 @@
     <children>
         <Label text="Start Game" style="-fx-font-size:18; -fx-font-weight:bold;"/>
 
-        <!-- Host/Slave Auswahl -->
-        <HBox spacing="10" alignment="CENTER">
+        <!-- Host/Slave -->
+        <HBox spacing="10" alignment="CENTER_LEFT" maxWidth="520">
             <children>
                 <RadioButton fx:id="hostModeBtn" text="Host" toggleGroup="$modeGroup" selected="true"/>
                 <RadioButton fx:id="slaveModeBtn" text="Slave" toggleGroup="$modeGroup"/>
                 <Label text="Host-IP:"/>
                 <TextField fx:id="hostAddressField" promptText="z. B. 192.168.0.10" prefWidth="160" disable="true"/>
+                <Pane HBox.hgrow="ALWAYS"/>
+                <Button fx:id="testConnBtn" text="Verbindung testen" disable="true"/>
+                <Button fx:id="openSlaveBtn" text="Als Slave öffnen" disable="true"/>
             </children>
         </HBox>
 
-        <!-- Neue Spielstand-Erstellung -->
-        <HBox spacing="8" alignment="CENTER">
+        <Separator maxWidth="520"/>
+
+        <!-- Neue Spielstand-Erstellung (Host) -->
+        <HBox spacing="8" alignment="CENTER" maxWidth="520">
             <children>
                 <TextField fx:id="saveNameField" promptText="Enter new save name…" prefWidth="260"/>
                 <Button fx:id="newBtn" text="New Game"/>
             </children>
         </HBox>
 
-        <!-- Vorhandene Saves -->
-        <HBox spacing="8" alignment="CENTER">
+        <!-- Vorhandene Saves (Host) -->
+        <HBox spacing="8" alignment="CENTER" maxWidth="520">
             <children>
                 <ComboBox fx:id="savesBox" promptText="Select existing save" prefWidth="260"/>
                 <Button fx:id="refreshSavesBtn" text="↻"/>
@@ -43,8 +47,8 @@
             </children>
         </HBox>
 
-        <!-- Backups zu gewähltem Save -->
-        <HBox spacing="8" alignment="CENTER">
+        <!-- Backups (Host) -->
+        <HBox spacing="8" alignment="CENTER" maxWidth="520">
             <children>
                 <ComboBox fx:id="backupsBox" promptText="Select backup of selected save" prefWidth="260"/>
                 <Button fx:id="refreshBackupsBtn" text="↻"/>

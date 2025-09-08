@@ -19,10 +19,13 @@ public class LauncherController {
         this.sceneManager = sceneManager;
     }
 
-    @FXML private ToggleGroup modeGroup;        // via FXML <ToggleGroup fx:id="modeGroup"/>
+    @FXML private ToggleGroup modeGroup;        // via FXML <fx:define>
     @FXML private RadioButton hostModeBtn;
     @FXML private RadioButton slaveModeBtn;
-    @FXML private TextField hostAddressField;   // Ziel-IP des Hosts (bei Slave)
+    @FXML private TextField hostAddressField;
+
+    @FXML private Button openSlaveBtn;          // „Als Slave öffnen“
+    @FXML private Button testConnBtn;           // „Verbindung testen“
 
     @FXML private TextField saveNameField;
     @FXML private Button newBtn;
@@ -35,84 +38,117 @@ public class LauncherController {
 
     @FXML
     private void initialize() {
-        // --- Sicherstellen, dass eine ToggleGroup existiert & Buttons drin sind ---
-        if (modeGroup == null) {
-            modeGroup = new ToggleGroup();
-        }
-        if (hostModeBtn != null && hostModeBtn.getToggleGroup() == null) {
-            hostModeBtn.setToggleGroup(modeGroup);
-        }
-        if (slaveModeBtn != null && slaveModeBtn.getToggleGroup() == null) {
-            slaveModeBtn.setToggleGroup(modeGroup);
-        }
-        // Falls noch nichts selektiert: Host als Default
-        if (modeGroup.getSelectedToggle() == null && hostModeBtn != null) {
-            hostModeBtn.setSelected(true);
+        // ToggleGroup robust sicherstellen
+        if (modeGroup == null) modeGroup = new ToggleGroup();
+        if (hostModeBtn != null && hostModeBtn.getToggleGroup() == null) hostModeBtn.setToggleGroup(modeGroup);
+        if (slaveModeBtn != null && slaveModeBtn.getToggleGroup() == null) slaveModeBtn.setToggleGroup(modeGroup);
+        if (modeGroup.getSelectedToggle() == null && hostModeBtn != null) hostModeBtn.setSelected(true);
+
+        // Live auf Mode-Wechsel reagieren
+        modeGroup.selectedToggleProperty().addListener((obs, o, n) -> applyMode(isSlaveSelected()));
+
+        // Live auf Adressänderungen reagieren (aktiviert/deaktiviert die Slave-Knöpfe)
+        if (hostAddressField != null) {
+            hostAddressField.textProperty().addListener((obs, ov, nv) -> applyMode(isSlaveSelected()));
         }
 
-        // Listener: UI -> Mode anwenden
-        modeGroup.selectedToggleProperty().addListener((obs, o, n) ->
-                applyMode(slaveModeBtn != null && slaveModeBtn.isSelected()));
+        // Slave-Buttons
+        if (openSlaveBtn != null) {
+            openSlaveBtn.setOnAction(e -> {
+                gameService.setHostAddress(getHost());
+                gameService.setNodeMode(NodeMode.SLAVE);
+                sceneManager.showGame();
+            });
+        }
+        if (testConnBtn != null) {
+            testConnBtn.setOnAction(e -> {
+                gameService.setHostAddress(getHost());
+                boolean ok = gameService.testConnectionToHost();
+                if (ok) info("Verbindung erfolgreich.\nHost erreichbar (Port 53536).");
+                else warn("Keine Verbindung.\nPrüfe IP, Port 53536 und Firewall am Host.");
+            });
+        }
 
-        // UI initial an aktuellen Zustand anpassen
-        applyMode(slaveModeBtn != null && slaveModeBtn.isSelected());
+        // Host-Buttons
+        if (newBtn != null) newBtn.setOnAction(e -> onNewGame());
+        if (loadBtn != null) loadBtn.setOnAction(e -> onLoadSelectedSave());
+        if (loadBackupBtn != null) loadBackupBtn.setOnAction(e -> onLoadSelectedBackup());
+        if (refreshSavesBtn != null) refreshSavesBtn.setOnAction(e -> refreshSaves());
+        if (refreshBackupsBtn != null) refreshBackupsBtn.setOnAction(e -> refreshBackups());
 
-        // Buttons
-        newBtn.setOnAction(e -> onNewGame());
-        loadBtn.setOnAction(e -> onLoadSelectedSave());
-        loadBackupBtn.setOnAction(e -> onLoadSelectedBackup());
-        refreshSavesBtn.setOnAction(e -> refreshSaves());
-        refreshBackupsBtn.setOnAction(e -> refreshBackups());
-
-        // Wenn Save gewählt wird, Namen ins Textfeld übernehmen & Backups aktualisieren
         if (savesBox != null) {
             savesBox.valueProperty().addListener((obs, oldV, newV) -> {
                 if (newV != null) {
                     if (saveNameField != null) saveNameField.setText(newV);
                     refreshBackups();
-                } else {
-                    if (backupsBox != null)
-                        backupsBox.setItems(FXCollections.observableArrayList());
+                } else if (backupsBox != null) {
+                    backupsBox.setItems(FXCollections.observableArrayList());
                 }
             });
         }
 
-        // initial laden
-        refreshSaves();
+        // UI initial konsistent setzen
+        applyMode(isSlaveSelected());
+        refreshSaves(); // lädt Saves (nur wenn Host)
     }
 
-    /** Zentral: Mode setzen + UI deaktivieren/aktivieren */
+    private boolean isSlaveSelected() {
+        return slaveModeBtn != null && slaveModeBtn.isSelected();
+    }
+
+    /** Zentral: Mode setzen + UI an/aus + Slave-Buttons abhängig von Host-Adresse. */
     private void applyMode(boolean slave) {
         if (slave) {
-            String addr = (hostAddressField != null) ? hostAddressField.getText() : null;
-            gameService.setHostAddress(addr);
+            gameService.setHostAddress(getHost());
             gameService.setNodeMode(NodeMode.SLAVE);
         } else {
             gameService.setNodeMode(NodeMode.HOST);
         }
 
-        // UI anpassen
-        if (saveNameField != null) saveNameField.setDisable(slave);
-        if (newBtn != null) newBtn.setDisable(slave);
-        if (savesBox != null) savesBox.setDisable(slave);
-        if (refreshSavesBtn != null) refreshSavesBtn.setDisable(slave);
-        if (loadBtn != null) loadBtn.setDisable(slave);
-        if (backupsBox != null) backupsBox.setDisable(slave);
-        if (refreshBackupsBtn != null) refreshBackupsBtn.setDisable(slave);
-        if (loadBackupBtn != null) loadBackupBtn.setDisable(slave);
-        if (hostAddressField != null) hostAddressField.setDisable(!slave);
+        // Host-UI
+        setDisable(saveNameField, slave);
+        setDisable(newBtn, slave);
+        setDisable(savesBox, slave);
+        setDisable(refreshSavesBtn, slave);
+        setDisable(loadBtn, slave);
+        setDisable(backupsBox, slave);
+        setDisable(refreshBackupsBtn, slave);
+        setDisable(loadBackupBtn, slave);
+
+        // Slave-UI
+        setDisable(hostAddressField, !slave);
+
+        boolean hasAnyAddress = !getHost().isBlank();
+        boolean validAddress  = isValidHost(getHost());
+
+        // „Verbindung testen“: nur Slave + irgendein Text
+        setDisable(testConnBtn, !slave || !hasAnyAddress);
+        // „Als Slave öffnen“: nur Slave + plausible Adresse (IPv4/Hostname)
+        setDisable(openSlaveBtn, !slave || !validAddress);
     }
 
-    private boolean isSlave() {
-        return gameService.getNodeMode() == NodeMode.SLAVE;
+    private void setDisable(Control c, boolean disable) {
+        if (c != null) c.setDisable(disable);
     }
+
+    private String getHost() {
+        String s = hostAddressField != null ? hostAddressField.getText() : "";
+        return s == null ? "" : s.trim();
+    }
+
+    // sehr einfache Plausibilitätsprüfung (IPv4 oder Hostname)
+    private boolean isValidHost(String s) {
+        if (s == null || s.isBlank()) return false;
+        // IPv4
+        if (s.matches("((25[0-5]|2[0-4]\\d|1?\\d?\\d)(\\.|$)){4}")) return true;
+        // Hostnamen (locker)
+        return s.matches("^[A-Za-z0-9._-]{1,253}$");
+    }
+
+    private boolean isSlave() { return gameService.getNodeMode() == NodeMode.SLAVE; }
 
     private void onNewGame() {
-        if (isSlave()) {
-            // Kein Save nötig – gleich ins Spiel (gleiches Fenster)
-            sceneManager.showGame();
-            return;
-        }
+        if (isSlave()) { sceneManager.showGame(); return; }
         String name = readName();
         if (name.isEmpty()) { warn("Please enter a name for the new game."); return; }
         try {
@@ -124,11 +160,8 @@ public class LauncherController {
     }
 
     private void onLoadSelectedSave() {
-        if (isSlave()) {
-            sceneManager.showGame();
-            return;
-        }
-        String selected = savesBox.getValue();
+        if (isSlave()) { sceneManager.showGame(); return; }
+        String selected = savesBox != null ? savesBox.getValue() : null;
         String name = (selected != null && !selected.isBlank()) ? selected : readName();
         if (name.isEmpty()) { warn("Pick a save from the list or type its name."); return; }
         try {
@@ -141,19 +174,12 @@ public class LauncherController {
     }
 
     private void onLoadSelectedBackup() {
-        if (isSlave()) {
-            sceneManager.showGame();
-            return;
-        }
-        String save = savesBox.getValue();
-        String backup = backupsBox.getValue();
+        if (isSlave()) { sceneManager.showGame(); return; }
+        String save = savesBox != null ? savesBox.getValue() : null;
+        String backup = backupsBox != null ? backupsBox.getValue() : null;
         if (save == null || save.isBlank()) { warn("Select a base save first."); return; }
         if (backup == null || backup.isBlank()) { warn("Select a backup to load."); return; }
-        try {
-            warn("Implement GameService.loadBackup(saveName, backupFile).");
-        } catch (Exception ex) {
-            error("Failed to load backup:\n" + ex.getMessage());
-        }
+        warn("Implement GameService.loadBackup(saveName, backupFile).");
     }
 
     private void refreshSaves() {
@@ -162,7 +188,7 @@ public class LauncherController {
             if (backupsBox != null) backupsBox.setItems(FXCollections.observableArrayList());
             return;
         }
-        List<String> names = List.of(); // fallback
+        List<String> names = List.of();
         try { names = gameService.listSaves(); } catch (Exception ignored) {}
         if (savesBox != null) {
             savesBox.setItems(FXCollections.observableArrayList(names));
@@ -181,7 +207,7 @@ public class LauncherController {
             if (backupsBox != null) backupsBox.setItems(FXCollections.observableArrayList());
             return;
         }
-        List<String> backups = List.of(); // fallback
+        List<String> backups = List.of();
         try { backups = gameService.listBackups(save); } catch (Exception ignored) {}
         if (backupsBox != null) {
             backupsBox.setItems(FXCollections.observableArrayList(backups));
@@ -195,6 +221,7 @@ public class LauncherController {
     }
 
     // Alerts
+    private static void info(String msg) { show(Alert.AlertType.INFORMATION, "Info", msg); }
     private static void warn(String msg) { show(Alert.AlertType.WARNING, "Warning", msg); }
     private static void error(String msg){ show(Alert.AlertType.ERROR, "Error", msg); }
     private static void show(Alert.AlertType type, String title, String msg) {
