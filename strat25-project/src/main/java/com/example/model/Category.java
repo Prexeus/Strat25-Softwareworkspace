@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,14 +49,16 @@ public class Category implements Serializable, CategoryInterface {
 
     // Falls später Teams dynamisch hinzukommen sollen:
     public void registerTeam(Team team) {
-        if (team == null) return;
+        if (team == null)
+            return;
         teamById.putIfAbsent(team.getId(), team);
         influenceMap.putIfAbsent(team.getId(), 0.0);
     }
 
     @Override
     public void addInfluence(Team team, double influence) {
-        if (team == null) return;
+        if (team == null)
+            return;
         // Sicherstellen, dass Team bekannt ist
         teamById.putIfAbsent(team.getId(), team);
         influenceMap.merge(team.getId(), influence, Double::sum);
@@ -90,19 +93,24 @@ public class Category implements Serializable, CategoryInterface {
         // 1) Classpath-Ressource
         try {
             URL cp = getClass().getResource(imageUrlSpec);
-            if (cp != null) return Optional.of(cp);
-        } catch (Exception ignored) {}
+            if (cp != null)
+                return Optional.of(cp);
+        } catch (Exception ignored) {
+        }
 
         // 2) Als absolute URL interpretieren
         try {
             return Optional.of(new URL(imageUrlSpec));
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         // 3) Als lokaler Dateipfad interpretieren
         try {
             Path p = Path.of(imageUrlSpec);
-            if (Files.exists(p)) return Optional.of(p.toUri().toURL());
-        } catch (Exception ignored) {}
+            if (Files.exists(p))
+                return Optional.of(p.toUri().toURL());
+        } catch (Exception ignored) {
+        }
 
         return Optional.empty();
     }
@@ -118,32 +126,41 @@ public class Category implements Serializable, CategoryInterface {
     @Override
     public void addTimedPrestige(double generalPrestigeMultiplier) {
         double multiplier = generalPrestigeMultiplier * this.prestigeMultiplier;
-        if (multiplier <= 0) return;
+        if (multiplier <= 0)
+            return;
 
-        // 1) Gesamtprestige anteilig verteilen (insg. 20)
-        double totalInfluence = influenceMap.values().stream()
-                .mapToDouble(Double::doubleValue)
+        // Positive Einflüsse herausfiltern
+        List<Map.Entry<Integer, Double>> positive = influenceMap.entrySet().stream()
+                .filter(e -> e.getValue() != null && e.getValue() > 0.0)
+                .toList();
+
+        // 1) Gesamtprestige anteilig verteilen (insg. 20) – nur auf Teams mit >0
+        // Einfluss
+        double totalPositive = positive.stream()
+                .mapToDouble(Map.Entry::getValue)
                 .sum();
 
-        if (totalInfluence > 0) {
+        if (totalPositive > 0.0) {
             double pool = 20.0 * multiplier;
-            for (Map.Entry<Integer, Double> entry : influenceMap.entrySet()) {
-                Team team = teamById.get(entry.getKey());
-                if (team == null) continue;
-                double share = entry.getValue() / totalInfluence;
+            for (Map.Entry<Integer, Double> e : positive) {
+                Team team = teamById.get(e.getKey());
+                if (team == null)
+                    continue;
+                double share = e.getValue() / totalPositive;
                 team.addPrestige(share * pool);
             }
         }
 
-        // 2) Top 3 Teams: je +5 Prestige
-        influenceMap.entrySet().stream()
+        // 2) Top 3 Bonus – nur Teams mit >0 Einfluss
+        positive.stream()
                 .sorted(Map.Entry.<Integer, Double>comparingByValue(Comparator.reverseOrder()))
                 .limit(3)
-                .forEach(entry -> {
-                    Team team = teamById.get(entry.getKey());
+                .forEach(e -> {
+                    Team team = teamById.get(e.getKey());
                     if (team != null) {
                         team.addPrestige(5.0 * multiplier);
                     }
                 });
     }
+
 }

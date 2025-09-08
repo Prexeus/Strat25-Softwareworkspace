@@ -9,9 +9,7 @@
 <?import javafx.scene.layout.*?>
 
 <GridPane xmlns="http://javafx.com/javafx/21"
-          xmlns:fx="http://javafx.com/fxml/1"
-          fx:controller="com.example.controller.ResultController"
-          hgap="0" vgap="0">
+    xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.controller.ResultController" hgap="0" vgap="0">
 
     <!-- 40% links (Extra-Kategorien), 60% rechts (Hauptbereich) -->
     <columnConstraints>
@@ -26,9 +24,10 @@
     </rowConstraints>
 
     <!-- LINKE SPALTE -->
-    <VBox GridPane.columnIndex="0" GridPane.rowIndex="0" GridPane.rowSpan="2"
-          spacing="10" fillWidth="true">
-        <padding><Insets topRightBottomLeft="12"/></padding>
+    <VBox GridPane.columnIndex="0" GridPane.rowIndex="0" GridPane.rowSpan="2" spacing="10" fillWidth="true">
+        <padding>
+            <Insets topRightBottomLeft="12"/>
+        </padding>
 
         <Label text="Kategorien" style="-fx-font-size:18; -fx-font-weight:bold;"/>
 
@@ -45,12 +44,13 @@
     </VBox>
 
     <!-- RECHTE SPALTE OBEN -->
-    <VBox GridPane.columnIndex="1" GridPane.rowIndex="0"
-          spacing="10" fillWidth="true">
-        <padding><Insets topRightBottomLeft="12"/></padding>
+    <VBox GridPane.columnIndex="1" GridPane.rowIndex="0" spacing="10" fillWidth="true">
+        <padding>
+            <Insets topRightBottomLeft="12"/>
+        </padding>
 
         <Label fx:id="activeBuildLabel" style="-fx-font-size:20; -fx-font-weight:bold;" text="—"/>
-        <Label fx:id="phaseTitleLabel"  style="-fx-font-size:16;" text="—"/>
+        <Label fx:id="phaseTitleLabel" style="-fx-font-size:16;" text="—"/>
 
         <GridPane VBox.vgrow="ALWAYS">
             <columnConstraints>
@@ -61,32 +61,16 @@
                 <RowConstraints vgrow="ALWAYS"/>
             </rowConstraints>
 
-            <StackPane fx:id="imageHolder"
-                       GridPane.columnIndex="0" GridPane.rowIndex="0"
-                       maxWidth="Infinity"
-                       minHeight="220"
-                       prefHeight="360">
+            <StackPane fx:id="imageHolder" GridPane.columnIndex="0" GridPane.rowIndex="0" maxWidth="Infinity" minHeight="220" prefHeight="360">
                 <children>
-                    <ImageView fx:id="phaseImageView"
-                               preserveRatio="true"
-                               smooth="true"
-                               cache="true"
-                               pickOnBounds="true"/>
+                    <ImageView fx:id="phaseImageView" preserveRatio="true" smooth="true" cache="true" pickOnBounds="true"/>
                 </children>
             </StackPane>
 
-            <StackPane fx:id="pieHolder"
-                       GridPane.columnIndex="1" GridPane.rowIndex="0"
-                       maxWidth="Infinity"
-                       minHeight="220"
-                       prefHeight="360">
+            <StackPane fx:id="pieHolder" GridPane.columnIndex="1" GridPane.rowIndex="0" maxWidth="Infinity" minHeight="220" prefHeight="360">
                 <children>
-                    <PieChart fx:id="influencePieChart"
-                              labelsVisible="false"
-                              legendVisible="false"/>
-                    <ImageView fx:id="pieCenterImage"
-                               mouseTransparent="true"
-                               preserveRatio="true"/>
+                    <PieChart fx:id="influencePieChart" labelsVisible="false" legendVisible="false"/>
+                    <ImageView fx:id="pieCenterImage" mouseTransparent="true" preserveRatio="true"/>
                 </children>
             </StackPane>
         </GridPane>
@@ -96,29 +80,23 @@
     </VBox>
 
     <!-- RECHTE SPALTE UNTEN -->
-    <VBox fx:id="rightBottomBox"
-          GridPane.columnIndex="1" GridPane.rowIndex="1"
-          spacing="10" fillWidth="true">
-        <padding><Insets topRightBottomLeft="12"/></padding>
+    <VBox fx:id="rightBottomBox" GridPane.columnIndex="1" GridPane.rowIndex="1" spacing="10" fillWidth="true">
+        <padding>
+            <Insets topRightBottomLeft="12"/>
+        </padding>
 
         <Label text="Gesamtbewertung – Prestige" style="-fx-font-size:18; -fx-font-weight:bold;"/>
 
         <!-- Horizontal: NumberAxis (x) wird komplett ausgeblendet -->
-        <StackedBarChart fx:id="prestigeChart"
-                         VBox.vgrow="ALWAYS"
-                         animated="false"
-                         legendVisible="false">
+        <StackedBarChart fx:id="prestigeChart" VBox.vgrow="ALWAYS" animated="false" legendVisible="false">
             <xAxis>
-                <NumberAxis fx:id="prestigeXAxis"
-                            visible="false"
-                            tickLabelsVisible="false"
-                            tickMarkVisible="false"
-                            minorTickVisible="false"
-                            autoRanging="true"/>
+                <NumberAxis fx:id="prestigeXAxis" visible="false" tickLabelsVisible="false" tickMarkVisible="false" minorTickVisible="false" autoRanging="true"/>
             </xAxis>
             <yAxis>
-                <CategoryAxis fx:id="prestigeYAxis"/>
+                <CategoryAxis fx:id="prestigeYAxis" tickLabelsVisible="false" tickMarkVisible="false"/>
             </yAxis>
+
+
         </StackedBarChart>
     </VBox>
 

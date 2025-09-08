@@ -304,28 +304,35 @@ public class BuildCategory implements CategoryInterface, Serializable {
     // Anteilig insg. 40 Prestige für die Teams,
     // + je 5 Prestige für die TOP 3 Teams
     @Override
-    public void addTimedPrestige(double prestigeMultiplierFromGame) {
-        // kombinierten Multiplikator (Game * Category)
-        double multiplier = prestigeMultiplierFromGame * this.prestigeMultiplier;
-        if (multiplier <= 0) return;
+    public void addTimedPrestige(double generalPrestigeMultiplier) {
+        double multiplier = generalPrestigeMultiplier * this.prestigeMultiplier;
+        if (multiplier <= 0)
+            return;
 
-        // 1) 40 Prestige anteilig nach Influence verteilen
-        double totalInfluence = influenceMap.values().stream()
-                .mapToDouble(Double::doubleValue)
+        // Positive Einflüsse herausfiltern
+        List<Map.Entry<Integer, Double>> positive = influenceMap.entrySet().stream()
+                .filter(e -> e.getValue() != null && e.getValue() > 0.0)
+                .toList();
+
+        // 1) Gesamtprestige anteilig verteilen (insg. 20) – nur auf Teams mit >0
+        // Einfluss
+        double totalPositive = positive.stream()
+                .mapToDouble(Map.Entry::getValue)
                 .sum();
 
-        if (totalInfluence > 0) {
+        if (totalPositive > 0.0) {
             double pool = 40.0 * multiplier;
-            for (Map.Entry<Integer, Double> e : influenceMap.entrySet()) {
+            for (Map.Entry<Integer, Double> e : positive) {
                 Team team = teamById.get(e.getKey());
-                if (team == null) continue;
-                double share = e.getValue() / totalInfluence;
+                if (team == null)
+                    continue;
+                double share = e.getValue() / totalPositive;
                 team.addPrestige(share * pool);
             }
         }
 
-        // 2) Top 3 Teams: je +5 Prestige
-        influenceMap.entrySet().stream()
+        // 2) Top 3 Bonus – nur Teams mit >0 Einfluss
+        positive.stream()
                 .sorted(Map.Entry.<Integer, Double>comparingByValue(Comparator.reverseOrder()))
                 .limit(3)
                 .forEach(e -> {
